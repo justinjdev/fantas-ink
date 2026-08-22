@@ -15,9 +15,10 @@
 
 1. Register an app at https://developer.yahoo.com/apps/, enable Fantasy Sports read access.
 2. Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32` and set it both in Vercel's env vars and locally (`export TOKEN_ENCRYPTION_KEY=...`) before running the setup script.
-3. `vercel env pull` (or set the vars above directly in the dashboard) for `YAHOO_CLIENT_ID`/`YAHOO_CLIENT_SECRET`/`YAHOO_REDIRECT_URI` locally.
-4. `cd server && npx tsx scripts/setup-yahoo-auth.ts` — follow the prompts, copy the printed `YAHOO_LEAGUE_KEY`/`YAHOO_MY_TEAM_KEY`/`YAHOO_INITIAL_REFRESH_TOKEN` into Vercel's env vars.
-5. `vercel deploy --prod`
+3. `vercel env pull` (or set the vars above directly in the dashboard) for `YAHOO_CLIENT_ID`/`YAHOO_CLIENT_SECRET`/`YAHOO_REDIRECT_URI`/`BLOB_READ_WRITE_TOKEN` locally — the setup script writes to Blob storage, so `BLOB_READ_WRITE_TOKEN` is required even for this one-time local run.
+4. `cd server && npx tsx --env-file=.env.local scripts/setup-yahoo-auth.ts` — follow the prompts, copy the printed `YAHOO_LEAGUE_KEY`/`YAHOO_MY_TEAM_KEY`/`YAHOO_INITIAL_REFRESH_TOKEN` into Vercel's env vars.
+5. In the Vercel project's settings, set **Root Directory** to `server` — otherwise Vercel won't find the `api/` directory to deploy.
+6. `vercel deploy --prod`
 
 ## Manual verification
 

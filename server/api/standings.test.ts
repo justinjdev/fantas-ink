@@ -62,4 +62,15 @@ describe('GET /api/standings', () => {
 
     expect(res.status).toHaveBeenCalledWith(401)
   })
+
+  it('returns 503 (not an unhandled 500) when storage throws', async () => {
+    getLatestStandingsMock.mockRejectedValue(new Error('blob service unavailable'))
+    const req = { query: { token: 'secret-token' } } as unknown as VercelRequest
+    const res = mockRes()
+
+    await handler(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(503)
+    expect(res.json).toHaveBeenCalledWith({ error: 'standings not yet available' })
+  })
 })
