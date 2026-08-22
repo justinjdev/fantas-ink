@@ -1000,6 +1000,16 @@ describe('GET /api/standings', () => {
     expect(res.status).toHaveBeenCalledWith(401)
   })
 
+  it('returns 401 when SHARED_TOKEN is unconfigured, even with no token param (fail closed, not open)', async () => {
+    process.env = { ...OLD_ENV, SHARED_TOKEN: undefined }
+    const req = { query: {} } as unknown as VercelRequest
+    const res = mockRes()
+
+    await handler(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(401)
+  })
+
   it('returns 200 with the stored payload when the token matches', async () => {
     const payload = { asOf: '2026-08-21T11:55:00Z', myTeamKey: 't.1', rows: [] }
     getLatestStandingsMock.mockResolvedValue(payload)
@@ -1038,7 +1048,10 @@ import { getLatestStandings } from '../lib/storage.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const token = req.query.token
-  if (token !== process.env.SHARED_TOKEN) {
+  // Fail closed: an unconfigured SHARED_TOKEN must never make this endpoint
+  // publicly readable. `undefined !== undefined` is false, so the equality
+  // check alone isn't enough — require SHARED_TOKEN to actually be set.
+  if (!process.env.SHARED_TOKEN || token !== process.env.SHARED_TOKEN) {
     res.status(401).json({ error: 'unauthorized' })
     return
   }
@@ -1056,7 +1069,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd server && npx vitest run api/standings.test.ts`
-Expected: PASS (3 tests).
+Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit**
 
