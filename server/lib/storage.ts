@@ -68,6 +68,7 @@ export async function setStoredRefreshToken(token: string): Promise<void> {
     contentType: 'application/json',
     cacheControlMaxAge: MIN_CACHE_CONTROL_MAX_AGE,
     addRandomSuffix: false,
+    allowOverwrite: true,
   })
 }
 
@@ -81,5 +82,6 @@ export async function setLatestStandings(payload: StandingsPayload): Promise<voi
     contentType: 'application/json',
     cacheControlMaxAge: MIN_CACHE_CONTROL_MAX_AGE,
     addRandomSuffix: false,
+    allowOverwrite: true,
   })
 }

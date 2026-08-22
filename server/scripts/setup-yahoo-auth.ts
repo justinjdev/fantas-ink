@@ -53,8 +53,18 @@ async function main() {
   console.log('Got initial tokens.')
   console.log(`YAHOO_INITIAL_REFRESH_TOKEN=${tokens.refreshToken}`)
 
-  await setStoredRefreshToken(tokens.refreshToken)
-  console.log('Seeded refresh token into Blob storage (requires BLOB_READ_WRITE_TOKEN in env).')
+  try {
+    await setStoredRefreshToken(tokens.refreshToken)
+    console.log('Seeded refresh token into Blob storage.')
+  } catch (err) {
+    console.warn(
+      'Could not seed Blob storage from here (this is expected when running locally — Vercel only allows ' +
+        'OIDC-based Blob access from real deployments, not local `vercel env pull` sessions). This is fine: ' +
+        'the YAHOO_INITIAL_REFRESH_TOKEN printed above is enough — api/cron.ts seeds Blob itself on its first ' +
+        'real run.'
+    )
+    console.warn(`  (${err instanceof Error ? err.message : err})`)
+  }
 
   const response = await fetch(
     'https://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games;game_keys=nhl/leagues/teams?format=json',
