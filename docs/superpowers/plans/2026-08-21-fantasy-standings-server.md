@@ -339,13 +339,14 @@ git commit -m "feat: add Yahoo OAuth token client"
 - Test: `server/lib/storage.test.ts`
 
 **Interfaces:**
-- Consumes: `@vercel/blob`'s `put`, `head` functions (mocked in tests).
+- Consumes: `@vercel/blob`'s `put`, `head` functions (mocked in tests); Node's built-in `node:crypto`.
 - Produces:
   - `getStoredRefreshToken(): Promise<string | null>`
   - `setStoredRefreshToken(token: string): Promise<void>`
   - `getLatestStandings(): Promise<StandingsPayload | null>` (uses the `StandingsPayload` type from Task 4, imported as a type-only import to avoid a circular runtime dependency)
   - `setLatestStandings(payload: StandingsPayload): Promise<void>`
-- Blob pathnames: refresh token at `private/yahoo-refresh-token.json` (private, no public URL needed since only `api/cron.ts` reads it), standings at `latest.json` (public, this is what `api/standings.ts` serves).
+- Blob pathnames: refresh token at `private/yahoo-refresh-token.json`, standings at `latest.json` (public, this is what `api/standings.ts` serves).
+- **Security correction (found during implementation, not in the original spec):** Vercel Blob has no true private/access-controlled mode — `put()`'s `access` option only accepts `'public'`. The only protection on a `'public'` blob is an unguessable random suffix Vercel appends to the URL by default; that's not enough for a live Yahoo OAuth refresh token; if the URL ever leaks (logs, dashboard, error reporting), the token is readable by anyone with the link, no auth required. So the refresh token blob's *content* is now AES-256-GCM encrypted before it's written, using a key from a new env var `TOKEN_ENCRYPTION_KEY` (base64-encoded 32 bytes, e.g. generated with `openssl rand -base64 32`). The standings blob is unaffected — it's meant to be publicly readable by the ESP32.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -366,28 +367,41 @@ const { getStoredRefreshToken, setStoredRefreshToken, getLatestStandings, setLat
   await import('./storage.js')
 
 describe('refresh token storage', () => {
+  const OLD_ENV = process.env
+
   beforeEach(() => {
     putMock.mockReset()
     headMock.mockReset()
+    // Fixed 32-byte test key, base64-encoded — same shape as a real TOKEN_ENCRYPTION_KEY.
+    process.env = { ...OLD_ENV, TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') }
   })
 
-  it('setStoredRefreshToken writes a private, non-cached JSON blob', async () => {
+  afterEach(() => {
+    process.env = OLD_ENV
+  })
+
+  it('setStoredRefreshToken writes an encrypted, non-cached JSON blob (never the raw token)', async () => {
     await setStoredRefreshToken('abc123')
 
-    expect(putMock).toHaveBeenCalledWith(
-      'private/yahoo-refresh-token.json',
-      JSON.stringify({ refreshToken: 'abc123' }),
-      expect.objectContaining({ access: 'public', contentType: 'application/json', cacheControlMaxAge: 0 })
-    )
+    expect(putMock).toHaveBeenCalledTimes(1)
+    const [pathname, body, options] = putMock.mock.calls[0]
+    expect(pathname).toBe('private/yahoo-refresh-token.json')
+    expect(body).not.toContain('abc123')
+    expect(options).toMatchObject({ access: 'public', contentType: 'application/json', cacheControlMaxAge: 0 })
   })
 
-  it('getStoredRefreshToken fetches the blob URL and parses it', async () => {
+  it('getStoredRefreshToken decrypts the stored blob back to the original token', async () => {
+    let storedBody = ''
+    putMock.mockImplementation((_pathname: string, body: string) => {
+      storedBody = body
+    })
     headMock.mockResolvedValue({ url: 'https://blob.example/private/yahoo-refresh-token.json' })
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ refreshToken: 'abc123' }) })
+      vi.fn().mockImplementation(async () => ({ ok: true, json: async () => JSON.parse(storedBody) }))
     )
 
+    await setStoredRefreshToken('abc123')
     const result = await getStoredRefreshToken()
 
     expect(result).toBe('abc123')
@@ -444,10 +458,38 @@ Expected: FAIL — `lib/storage.ts` does not exist.
 ```typescript
 // server/lib/storage.ts
 import { put, head } from '@vercel/blob'
+import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto'
 import type { StandingsPayload } from './transform.js'
 
 const REFRESH_TOKEN_PATH = 'private/yahoo-refresh-token.json'
 const STANDINGS_PATH = 'latest.json'
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm'
+const IV_LENGTH = 12
+const AUTH_TAG_LENGTH = 16
+
+function getEncryptionKey(): Buffer {
+  const key = process.env.TOKEN_ENCRYPTION_KEY
+  if (!key) throw new Error('TOKEN_ENCRYPTION_KEY is not set')
+  return Buffer.from(key, 'base64')
+}
+
+// IV || authTag || ciphertext, base64-encoded as a single string.
+function encrypt(plaintext: string): string {
+  const iv = randomBytes(IV_LENGTH)
+  const cipher = createCipheriv(ENCRYPTION_ALGORITHM, getEncryptionKey(), iv)
+  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+  return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString('base64')
+}
+
+function decrypt(encoded: string): string {
+  const data = Buffer.from(encoded, 'base64')
+  const iv = data.subarray(0, IV_LENGTH)
+  const authTag = data.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH)
+  const ciphertext = data.subarray(IV_LENGTH + AUTH_TAG_LENGTH)
+  const decipher = createDecipheriv(ENCRYPTION_ALGORITHM, getEncryptionKey(), iv)
+  decipher.setAuthTag(authTag)
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8')
+}
 
 function isNotFound(err: unknown): boolean {
   return typeof err === 'object' && err !== null && 'status' in err && (err as { status: number }).status === 404
@@ -466,12 +508,12 @@ async function readJsonBlob<T>(pathname: string): Promise<T | null> {
 }
 
 export async function getStoredRefreshToken(): Promise<string | null> {
-  const data = await readJsonBlob<{ refreshToken: string }>(REFRESH_TOKEN_PATH)
-  return data?.refreshToken ?? null
+  const data = await readJsonBlob<{ encryptedToken: string }>(REFRESH_TOKEN_PATH)
+  return data ? decrypt(data.encryptedToken) : null
 }
 
 export async function setStoredRefreshToken(token: string): Promise<void> {
-  await put(REFRESH_TOKEN_PATH, JSON.stringify({ refreshToken: token }), {
+  await put(REFRESH_TOKEN_PATH, JSON.stringify({ encryptedToken: encrypt(token) }), {
     access: 'public',
     contentType: 'application/json',
     cacheControlMaxAge: 0,
@@ -1034,7 +1076,7 @@ git commit -m "feat: add public GET /api/standings endpoint"
 **Interfaces:**
 - Consumes: `refreshAccessToken` (Task 2), `getStoredRefreshToken`/`setStoredRefreshToken`/`setLatestStandings` (Task 3), `transformStandings` (Task 4), `fetchLeagueStandings` (Task 5).
 - Produces: default-exported handler deployed at `POST /api/cron` (Vercel Cron issues GET by default — this plan uses GET to match Vercel's default invocation, see step 3).
-- Env vars consumed: `CRON_SECRET`, `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET`, `YAHOO_REDIRECT_URI`, `YAHOO_INITIAL_REFRESH_TOKEN`, `YAHOO_LEAGUE_KEY`, `YAHOO_MY_TEAM_KEY`.
+- Env vars consumed directly: `CRON_SECRET`, `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET`, `YAHOO_REDIRECT_URI`, `YAHOO_INITIAL_REFRESH_TOKEN`, `YAHOO_LEAGUE_KEY`, `YAHOO_MY_TEAM_KEY`. Also indirectly requires `TOKEN_ENCRYPTION_KEY` to be set (consumed inside `lib/storage.ts`, not read here directly) — without it, `setStoredRefreshToken` throws.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1224,7 +1266,7 @@ git commit -m "feat: add cron orchestration endpoint"
 - Test: `server/scripts/setup-yahoo-auth.test.ts` (covers only the pure helper, per below)
 
 **Interfaces:**
-- Consumes: `buildAuthorizeUrl`, `exchangeCodeForTokens` (Task 2), `setStoredRefreshToken` (Task 3), `findByKey`/`numberedEntries` (Task 4's `lib/yahooJson.ts` — reuse these, do not redefine them here).
+- Consumes: `buildAuthorizeUrl`, `exchangeCodeForTokens` (Task 2), `setStoredRefreshToken` (Task 3), `findByKey`/`numberedEntries` (Task 4's `lib/yahooJson.ts` — reuse these, do not redefine them here). `setStoredRefreshToken` encrypts with `TOKEN_ENCRYPTION_KEY`, so this script requires that env var set locally before running (it seeds the encrypted blob directly, same as the deployed cron job would).
 - Produces: `parseLeagueTeamKeys(rawJson: unknown): Array<{ leagueKey: string; leagueName: string; teamKey: string; teamName: string }>` (pure, unit-tested), plus an interactive `main()` that is run manually, not unit tested (it does readline I/O and live network calls by design).
 
 This script is run once, locally, by a human — not deployed. Its job: get the first refresh token, and print the league/team keys needed for `YAHOO_LEAGUE_KEY` and `YAHOO_MY_TEAM_KEY`.
@@ -1431,13 +1473,15 @@ Note: Vercel Cron schedules run in UTC and do **not** auto-adjust for daylight s
 - `CRON_SECRET` — random string; Vercel sends it automatically as `Authorization: Bearer <value>` when invoking cron-triggered functions
 - `SHARED_TOKEN` — random string the ESP32 sends as `?token=` when calling `/api/standings`
 - `BLOB_READ_WRITE_TOKEN` — from enabling Vercel Blob on the project
+- `TOKEN_ENCRYPTION_KEY` — base64-encoded 32-byte AES-256 key encrypting the stored refresh token at rest in Blob (generate with `openssl rand -base64 32`); required both in Vercel's env and locally when running the setup script, since the script seeds the encrypted blob directly
 
 ## One-time setup
 
 1. Register an app at https://developer.yahoo.com/apps/, enable Fantasy Sports read access.
-2. `vercel env pull` (or set the vars above directly in the dashboard) for `YAHOO_CLIENT_ID`/`YAHOO_CLIENT_SECRET`/`YAHOO_REDIRECT_URI` locally.
-3. `cd server && npx tsx scripts/setup-yahoo-auth.ts` — follow the prompts, copy the printed `YAHOO_LEAGUE_KEY`/`YAHOO_MY_TEAM_KEY`/`YAHOO_INITIAL_REFRESH_TOKEN` into Vercel's env vars.
-4. `vercel deploy --prod`
+2. Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32` and set it both in Vercel's env vars and locally (`export TOKEN_ENCRYPTION_KEY=...`) before running the setup script.
+3. `vercel env pull` (or set the vars above directly in the dashboard) for `YAHOO_CLIENT_ID`/`YAHOO_CLIENT_SECRET`/`YAHOO_REDIRECT_URI` locally.
+4. `cd server && npx tsx scripts/setup-yahoo-auth.ts` — follow the prompts, copy the printed `YAHOO_LEAGUE_KEY`/`YAHOO_MY_TEAM_KEY`/`YAHOO_INITIAL_REFRESH_TOKEN` into Vercel's env vars.
+5. `vercel deploy --prod`
 
 ## Manual verification
 
