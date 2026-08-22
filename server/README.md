@@ -3,7 +3,7 @@
 ## Environment variables (set in Vercel project settings)
 
 - `YAHOO_CLIENT_ID`, `YAHOO_CLIENT_SECRET` — from your Yahoo Developer app
-- `YAHOO_REDIRECT_URI` — must match the redirect URI registered on the Yahoo app (use `oob` for out-of-band if you don't have a callback page)
+- `YAHOO_REDIRECT_URI` — must match the redirect URI registered on the Yahoo app. Yahoo rejects the literal string `oob`; use a real-looking HTTPS URL instead (see step 1 below — it never needs to actually resolve to anything).
 - `YAHOO_INITIAL_REFRESH_TOKEN` — bootstrap value from `setup-yahoo-auth.ts`; only used if Blob storage has no rotated token yet
 - `YAHOO_LEAGUE_KEY`, `YAHOO_MY_TEAM_KEY` — from `setup-yahoo-auth.ts` output
 - `CRON_SECRET` — random string; Vercel sends it automatically as `Authorization: Bearer <value>` when invoking cron-triggered functions
@@ -18,7 +18,7 @@
 3. Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32` and set it both in Vercel's env vars and locally (`export TOKEN_ENCRYPTION_KEY=...`) before running the setup script.
 4. Connect the Blob store to the project (Storage tab → your store → Connect Project) before doing anything else — this is what makes `BLOB_STORE_ID`/`VERCEL_OIDC_TOKEN` available at all.
 5. `vercel env pull` for `YAHOO_CLIENT_ID`/`YAHOO_CLIENT_SECRET`/`YAHOO_REDIRECT_URI` plus the Blob vars from step 4 — the setup script writes to Blob storage, so it needs these even for this one-time local run.
-6. `cd server && npx tsx --env-file=.env.local scripts/setup-yahoo-auth.ts` — follow the prompts, copy the printed `YAHOO_LEAGUE_KEY`/`YAHOO_MY_TEAM_KEY`/`YAHOO_INITIAL_REFRESH_TOKEN` into Vercel's env vars. The final step of this script (listing leagues/teams) requires step 2's access approval to have landed — the token seeding step before it will still succeed even if that hasn't happened yet.
+6. `cd server && node --env-file=.env.local --import tsx scripts/setup-yahoo-auth.ts` — follow the prompts, copy the printed `YAHOO_LEAGUE_KEY`/`YAHOO_MY_TEAM_KEY`/`YAHOO_INITIAL_REFRESH_TOKEN` into Vercel's env vars. (Use this exact form, not `npx tsx --env-file=...` — `tsx`'s own CLI doesn't honor `--env-file`, it silently ignores it.) The Blob-seeding step will fail locally with `BlobOidcEnvironmentNotAllowedError` — that's expected (Vercel only allows OIDC Blob access from real deployments), and the script continues past it. `api/cron.ts` seeds Blob itself on its first real run using `YAHOO_INITIAL_REFRESH_TOKEN`. The leagues/teams listing at the end requires step 2's access approval to have landed; if it hasn't, you'll still get `YAHOO_INITIAL_REFRESH_TOKEN` printed and can come back for `YAHOO_LEAGUE_KEY`/`YAHOO_MY_TEAM_KEY` once approved.
 7. In the Vercel project's settings, set **Root Directory** to `server` — otherwise Vercel won't find the `api/` directory to deploy.
 8. `vercel deploy --prod`
 
