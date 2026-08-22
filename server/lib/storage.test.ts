@@ -44,6 +44,7 @@ describe('refresh token storage', () => {
       contentType: 'application/json',
       cacheControlMaxAge: 60,
       addRandomSuffix: false,
+      allowOverwrite: true,
     })
   })
 
@@ -96,6 +97,7 @@ describe('standings storage', () => {
         contentType: 'application/json',
         cacheControlMaxAge: 60,
         addRandomSuffix: false,
+        allowOverwrite: true,
       })
     )
   })
