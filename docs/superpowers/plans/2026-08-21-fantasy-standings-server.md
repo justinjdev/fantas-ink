@@ -8,6 +8,38 @@
 
 **Tech Stack:** TypeScript, `@vercel/node` (standalone serverless functions, no Next.js needed), `@vercel/blob`, Vitest for unit tests, Node 20 runtime.
 
+## Current Status (2026-08-22)
+
+**Server: deployed and verified working, except for the one thing outside our control.**
+
+Live at `https://fantas-ink-server.vercel.app`. Deployed from `main` after PR #1 (initial implementation) and PR #2 (fixes found while actually setting up the real Vercel/Yahoo accounts — see the "Post-*" sections below for what those were). OAuth token refresh, AES-256-GCM encryption, and Vercel Blob read/write/overwrite are all confirmed working against the real deployed infrastructure — verified by manually triggering `/api/cron` four consecutive times, not just by the mocked test suite (which, notably, did NOT catch three of the four real bugs found this way).
+
+### Blocked on: Yahoo Fantasy Sports API access approval
+
+Yahoo gated Fantasy Sports API access behind manual review sometime around May 2026 (see the Global Constraints section below for details). The access request was submitted for this app but has not been approved yet — no published SLA, no way to expedite. Every `/api/cron` run currently fails at the standings-fetch step with `401 additional_authorization_required`, which is expected and not a bug — the token-refresh and Blob-storage steps before it succeed every time.
+
+**What's blocked by this specifically:**
+- `YAHOO_LEAGUE_KEY` and `YAHOO_MY_TEAM_KEY` are not set yet — the leagues/teams lookup that discovers them also 401s until access is approved.
+- Real standings data has never been fetched or seen rendered through this pipeline.
+
+**What to do once Yahoo approves access:**
+1. Re-run the leagues/teams lookup (either re-run `scripts/setup-yahoo-auth.ts`'s OAuth flow with a fresh authorization code, or write a small one-off script that calls `refreshAccessToken` with the already-stored refresh token and then hits the same `users;use_login=1/games;game_keys=nhl/leagues/teams` endpoint — no new Yahoo login needed for the latter).
+2. Set `YAHOO_LEAGUE_KEY` and `YAHOO_MY_TEAM_KEY` in Vercel (Production environment).
+3. Trigger `/api/cron` once more and confirm it returns `{ok: true, asOf: "..."}` instead of the 401 error.
+4. `curl` `/api/standings?token=$SHARED_TOKEN` and confirm it returns real standings matching your actual Yahoo league (not just well-formed JSON — check team names, ranks, and records against the real league).
+
+### Separately outstanding
+
+- **ESP32 firmware is entirely unbuilt.** This plan only ever covered the server half. The design spec (`docs/superpowers/specs/2026-08-21-fantasy-hockey-eink-scoreboard-design.md`) covers the firmware's architecture at a high level, but there's no implementation plan for it yet — that needs its own brainstorm → spec → plan → implement cycle, same as this server did. Notably still unverified from the original design spec: the exact BUSY/RST/DC/CS/SCK/MOSI pin mapping for the Waveshare ESP32 driver board (flagged then as "verify against Waveshare's wiki during implementation," never actually done since firmware work hasn't started).
+- **Deferred Minor findings, never revisited** (all confirmed low-severity/non-blocking by whichever reviewer flagged them; listed here so they don't get silently forgotten, not because they need urgent action):
+  - No test covers the `TOKEN_ENCRYPTION_KEY`-missing error path, or IV uniqueness across `encrypt()` calls (`lib/storage.test.ts`).
+  - `parseLeagueTeamKeys` throws (doesn't gracefully handle) a league with no teams container — acceptable for a one-off manual script, per the original review.
+  - `numberedEntries` filters out only the `count` key rather than whitelisting numeric-looking keys — a bit less defensive than it could be against Yahoo adding sibling metadata fields.
+  - `package.json` has no `engines` field despite targeting Node 20/24; `tsx` is used in the README's documented commands but isn't a declared devDependency (relies on whatever's globally available via `npx`).
+  - Neither `api/cron.ts` nor `api/standings.ts` checks `req.method` — both would process a POST/DELETE identically to a GET, since the bearer-token/shared-token check is the real gate either way.
+  - `api/cron.ts`'s 500 response body echoes the raw `err.message` on unexpected failures — a minor internal-detail leak to anyone who knows or guesses `CRON_SECRET`.
+  - `vitest.config.ts`'s `passWithNoTests: true` was an undocumented deviation from the original plan text (added by Task 1's implementer to make `npm test` pass on an empty suite) — harmless now that real tests exist, but would silently green a broken test glob if one were ever introduced.
+
 ## Global Constraints
 
 - The public `GET /api/standings` endpoint must never call Yahoo live — it only reads the last value `api/cron.ts` wrote to Blob. (From spec: "ESP32 never blocks on OAuth latency.")
