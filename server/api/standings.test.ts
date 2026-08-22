@@ -52,4 +52,14 @@ describe('GET /api/standings', () => {
 
     expect(res.status).toHaveBeenCalledWith(503)
   })
+
+  it('returns 401 when SHARED_TOKEN is unconfigured, even with no token param (fail closed, not open)', async () => {
+    process.env.SHARED_TOKEN = undefined
+    const req = { query: {} } as unknown as VercelRequest
+    const res = mockRes()
+
+    await handler(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(401)
+  })
 })

@@ -3,7 +3,7 @@ import { getLatestStandings } from '../lib/storage.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const token = req.query.token
-  if (token !== process.env.SHARED_TOKEN) {
+  if (!process.env.SHARED_TOKEN || token !== process.env.SHARED_TOKEN) {
     res.status(401).json({ error: 'unauthorized' })
     return
   }
