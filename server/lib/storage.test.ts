@@ -1,5 +1,5 @@
 // server/lib/storage.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const putMock = vi.fn()
 const headMock = vi.fn()
@@ -14,28 +14,41 @@ const { getStoredRefreshToken, setStoredRefreshToken, getLatestStandings, setLat
   await import('./storage.js')
 
 describe('refresh token storage', () => {
+  const OLD_ENV = process.env
+
   beforeEach(() => {
     putMock.mockReset()
     headMock.mockReset()
+    // Fixed 32-byte test key, base64-encoded — same shape as a real TOKEN_ENCRYPTION_KEY.
+    process.env = { ...OLD_ENV, TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') }
   })
 
-  it('setStoredRefreshToken writes a private, non-cached JSON blob', async () => {
+  afterEach(() => {
+    process.env = OLD_ENV
+  })
+
+  it('setStoredRefreshToken writes an encrypted, non-cached JSON blob (never the raw token)', async () => {
     await setStoredRefreshToken('abc123')
 
-    expect(putMock).toHaveBeenCalledWith(
-      'private/yahoo-refresh-token.json',
-      JSON.stringify({ refreshToken: 'abc123' }),
-      expect.objectContaining({ access: 'public', contentType: 'application/json', cacheControlMaxAge: 0 })
-    )
+    expect(putMock).toHaveBeenCalledTimes(1)
+    const [pathname, body, options] = putMock.mock.calls[0]
+    expect(pathname).toBe('private/yahoo-refresh-token.json')
+    expect(body).not.toContain('abc123')
+    expect(options).toMatchObject({ access: 'public', contentType: 'application/json', cacheControlMaxAge: 0 })
   })
 
-  it('getStoredRefreshToken fetches the blob URL and parses it', async () => {
+  it('getStoredRefreshToken decrypts the stored blob back to the original token', async () => {
+    let storedBody = ''
+    putMock.mockImplementation((_pathname: string, body: string) => {
+      storedBody = body
+    })
     headMock.mockResolvedValue({ url: 'https://blob.example/private/yahoo-refresh-token.json' })
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ refreshToken: 'abc123' }) })
+      vi.fn().mockImplementation(async () => ({ ok: true, json: async () => JSON.parse(storedBody) }))
     )
 
+    await setStoredRefreshToken('abc123')
     const result = await getStoredRefreshToken()
 
     expect(result).toBe('abc123')
