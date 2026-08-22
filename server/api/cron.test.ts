@@ -61,6 +61,17 @@ describe('GET /api/cron', () => {
     expect(refreshAccessTokenMock).not.toHaveBeenCalled()
   })
 
+  it('rejects "Bearer undefined" when CRON_SECRET is unset (fail closed, not open)', async () => {
+    process.env.CRON_SECRET = undefined
+    const req = { headers: { authorization: 'Bearer undefined' } } as unknown as VercelRequest
+    const res = mockRes()
+
+    await handler(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(401)
+    expect(refreshAccessTokenMock).not.toHaveBeenCalled()
+  })
+
   it('uses the stored refresh token when present, refreshes, fetches, transforms, and stores', async () => {
     getStoredRefreshTokenMock.mockResolvedValue('stored-refresh-token')
     refreshAccessTokenMock.mockResolvedValue({ accessToken: 'access-1', refreshToken: 'rotated-refresh', expiresIn: 3600 })

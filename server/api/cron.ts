@@ -4,10 +4,12 @@ import { getStoredRefreshToken, setStoredRefreshToken, setLatestStandings } from
 import { refreshAccessToken } from '../lib/yahoo.js'
 import { fetchLeagueStandings } from '../lib/fetchStandings.js'
 import { transformStandings } from '../lib/transform.js'
+import { timingSafeStringEqual } from '../lib/safeCompare.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const authHeader = req.headers.authorization
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const expected = `Bearer ${process.env.CRON_SECRET}`
+  if (!process.env.CRON_SECRET || !timingSafeStringEqual(authHeader ?? '', expected)) {
     res.status(401).json({ error: 'unauthorized' })
     return
   }
