@@ -352,7 +352,7 @@ git commit -m "feat: add Yahoo OAuth token client"
 
 ```typescript
 // server/lib/storage.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const putMock = vi.fn()
 const headMock = vi.fn()
