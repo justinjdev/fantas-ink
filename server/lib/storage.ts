@@ -59,11 +59,14 @@ export async function getStoredRefreshToken(): Promise<string | null> {
   return data ? decrypt(data.encryptedToken) : null
 }
 
+// Vercel Blob enforces a minimum cacheControlMaxAge of 60 seconds; 0 is rejected.
+const MIN_CACHE_CONTROL_MAX_AGE = 60
+
 export async function setStoredRefreshToken(token: string): Promise<void> {
   await put(REFRESH_TOKEN_PATH, JSON.stringify({ encryptedToken: encrypt(token) }), {
     access: 'public',
     contentType: 'application/json',
-    cacheControlMaxAge: 0,
+    cacheControlMaxAge: MIN_CACHE_CONTROL_MAX_AGE,
     addRandomSuffix: false,
   })
 }
@@ -76,7 +79,7 @@ export async function setLatestStandings(payload: StandingsPayload): Promise<voi
   await put(STANDINGS_PATH, JSON.stringify(payload), {
     access: 'public',
     contentType: 'application/json',
-    cacheControlMaxAge: 0,
+    cacheControlMaxAge: MIN_CACHE_CONTROL_MAX_AGE,
     addRandomSuffix: false,
   })
 }

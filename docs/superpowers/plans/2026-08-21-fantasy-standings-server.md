@@ -28,6 +28,10 @@ The task-by-task sections below reflect the plan as originally written and execu
 - **New file `server/.vercelignore`:** `*.test.ts` — without it, Vercel's zero-config function detection would deploy `api/cron.test.ts` and `api/standings.test.ts` as public functions.
 - **`server/README.md`:** setup steps now add `--env-file=.env.local` to the `tsx` invocation (nothing previously loaded the pulled env file into the script's process), list `BLOB_READ_WRITE_TOKEN` as required locally (the setup script writes to Blob), and note the Vercel project's Root Directory must be set to `server`.
 
+**Post-PR-review round (Copilot):** three more findings caught after the branch was pushed:
+- **`server/lib/storage.ts`:** both `put()` calls used `cacheControlMaxAge: 0`; Vercel Blob enforces a 60-second minimum, so this was likely rejected server-side, meaning every write could fail outright. Now `cacheControlMaxAge: 60` (a `MIN_CACHE_CONTROL_MAX_AGE` constant), harmless given data changes at most once a day. `storage.test.ts` now asserts `cacheControlMaxAge: 60` and `addRandomSuffix: false` on both the refresh-token and standings write tests (previously only partially asserted, so a regression on either option wouldn't have been caught).
+- **`server/scripts/setup-yahoo-auth.ts`:** the entry-point check `import.meta.url === \`file://${process.argv[1]}\`` compared a percent-encoded URL against a raw filesystem path — false on Windows or paths containing spaces, silently no-op-ing the documented setup command. Now uses `pathToFileURL(process.argv[1]).href` from `node:url`.
+
 ---
 
 ### Task 1: Project scaffold

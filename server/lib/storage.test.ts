@@ -39,7 +39,12 @@ describe('refresh token storage', () => {
     const [pathname, body, options] = putMock.mock.calls[0]
     expect(pathname).toBe('private/yahoo-refresh-token.json')
     expect(body).not.toContain('abc123')
-    expect(options).toMatchObject({ access: 'public', contentType: 'application/json', cacheControlMaxAge: 0 })
+    expect(options).toMatchObject({
+      access: 'public',
+      contentType: 'application/json',
+      cacheControlMaxAge: 60,
+      addRandomSuffix: false,
+    })
   })
 
   it('getStoredRefreshToken decrypts the stored blob back to the original token', async () => {
@@ -86,7 +91,12 @@ describe('standings storage', () => {
     expect(putMock).toHaveBeenCalledWith(
       'latest.json',
       JSON.stringify(payload),
-      expect.objectContaining({ access: 'public', contentType: 'application/json' })
+      expect.objectContaining({
+        access: 'public',
+        contentType: 'application/json',
+        cacheControlMaxAge: 60,
+        addRandomSuffix: false,
+      })
     )
   })
 

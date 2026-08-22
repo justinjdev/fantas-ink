@@ -1,4 +1,5 @@
 import * as readline from 'node:readline/promises'
+import { pathToFileURL } from 'node:url'
 import { buildAuthorizeUrl, exchangeCodeForTokens } from '../lib/yahoo.js'
 import { setStoredRefreshToken } from '../lib/storage.js'
 import { findByKey, numberedEntries } from '../lib/yahooJson.js'
@@ -73,7 +74,7 @@ async function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err)
     process.exit(1)
