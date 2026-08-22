@@ -523,18 +523,93 @@ git commit -m "feat: add Blob storage helpers for refresh token and standings"
 ### Task 4: Standings transform (top-3 + neighborhood windowing)
 
 **Files:**
+- Create: `server/lib/yahooJson.ts`
+- Test: `server/lib/yahooJson.test.ts`
 - Modify: `server/lib/transform.ts` (replaces Task 3's placeholder)
 - Test: `server/lib/transform.test.ts`
 
 **Interfaces:**
-- Consumes: nothing external — pure function.
+- Consumes: nothing external — pure functions.
 - Produces:
+  - `findByKey(node: unknown, key: string): unknown` and `numberedEntries(container: Record<string, unknown>): unknown[]` from `server/lib/yahooJson.ts` — shared Yahoo JSON-navigation helpers. Task 8's setup script also imports these; do not duplicate them there.
   - `StandingsPayload` (as declared in Task 3, kept identical)
   - `transformStandings(rawYahooJson: unknown, myTeamKey: string, asOf: string): StandingsPayload`
 
 This is the module the spec calls out as needing thorough coverage — test the windowing/dedup/gap logic across boundary cases, not just the happy path.
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Write the failing test for the shared JSON-navigation helpers**
+
+```typescript
+// server/lib/yahooJson.test.ts
+import { describe, it, expect } from 'vitest'
+import { findByKey, numberedEntries } from './yahooJson.js'
+
+describe('findByKey', () => {
+  it('finds a key nested inside arrays and objects at any depth', () => {
+    const node = [{}, { a: [{ b: { target: 'found' } }] }]
+    expect(findByKey(node, 'target')).toBe('found')
+  })
+
+  it('returns undefined when the key is absent', () => {
+    expect(findByKey({ a: { b: 1 } }, 'missing')).toBeUndefined()
+  })
+})
+
+describe('numberedEntries', () => {
+  it('returns the numbered values and excludes the sibling "count" key', () => {
+    const container = { '0': 'a', '1': 'b', count: 2 }
+    expect(numberedEntries(container)).toEqual(['a', 'b'])
+  })
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd server && npx vitest run lib/yahooJson.test.ts`
+Expected: FAIL — `lib/yahooJson.ts` does not exist.
+
+- [ ] **Step 3: Write the shared helpers implementation**
+
+```typescript
+// server/lib/yahooJson.ts
+// Yahoo's JSON represents arrays as objects with stringified numeric keys plus
+// a sibling "count" key, with inconsistent nesting depth. These helpers search
+// by key name rather than assuming fixed positions or depths. Shared by
+// lib/transform.ts and scripts/setup-yahoo-auth.ts — do not duplicate.
+export function numberedEntries(container: Record<string, unknown>): unknown[] {
+  const entries: unknown[] = []
+  for (const [key, value] of Object.entries(container)) {
+    if (key === 'count') continue
+    entries.push(value)
+  }
+  return entries
+}
+
+export function findByKey(node: unknown, key: string): unknown {
+  if (node === null || typeof node !== 'object') return undefined
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findByKey(item, key)
+      if (found !== undefined) return found
+    }
+    return undefined
+  }
+  const record = node as Record<string, unknown>
+  if (key in record) return record[key]
+  for (const value of Object.values(record)) {
+    const found = findByKey(value, key)
+    if (found !== undefined) return found
+  }
+  return undefined
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd server && npx vitest run lib/yahooJson.test.ts`
+Expected: PASS (3 tests).
+
+- [ ] **Step 5: Write the failing tests for the transform**
 
 ```typescript
 // server/lib/transform.test.ts
@@ -641,15 +716,17 @@ describe('transformStandings', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 6: Run test to verify it fails**
 
 Run: `cd server && npx vitest run lib/transform.test.ts`
 Expected: FAIL — `transformStandings` not exported (only the placeholder type exists).
 
-- [ ] **Step 3: Write the implementation**
+- [ ] **Step 7: Write the implementation**
 
 ```typescript
 // server/lib/transform.ts
+import { findByKey, numberedEntries } from './yahooJson.js'
+
 export interface StandingsPayload {
   asOf: string
   myTeamKey: string
@@ -667,36 +744,6 @@ interface ParsedTeam {
   wins: number
   losses: number
   ties: number
-}
-
-// Yahoo's JSON represents arrays as objects with stringified numeric keys plus
-// a sibling "count" key. Extract the numbered entries regardless of exact
-// nesting depth by walking the object rather than assuming fixed indices.
-function numberedEntries(container: Record<string, unknown>): unknown[] {
-  const entries: unknown[] = []
-  for (const [key, value] of Object.entries(container)) {
-    if (key === 'count') continue
-    entries.push(value)
-  }
-  return entries
-}
-
-function findByKey(node: unknown, key: string): unknown {
-  if (node === null || typeof node !== 'object') return undefined
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      const found = findByKey(item, key)
-      if (found !== undefined) return found
-    }
-    return undefined
-  }
-  const record = node as Record<string, unknown>
-  if (key in record) return record[key]
-  for (const value of Object.values(record)) {
-    const found = findByKey(value, key)
-    if (found !== undefined) return found
-  }
-  return undefined
 }
 
 function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
@@ -764,15 +811,15 @@ export function transformStandings(rawYahooJson: unknown, myTeamKey: string, asO
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 8: Run test to verify it passes**
 
 Run: `cd server && npx vitest run lib/transform.test.ts`
 Expected: PASS (7 tests).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add server/lib/transform.ts server/lib/transform.test.ts
+git add server/lib/yahooJson.ts server/lib/yahooJson.test.ts server/lib/transform.ts server/lib/transform.test.ts
 git commit -m "feat: add standings windowing/dedup transform"
 ```
 
@@ -1177,7 +1224,7 @@ git commit -m "feat: add cron orchestration endpoint"
 - Test: `server/scripts/setup-yahoo-auth.test.ts` (covers only the pure helper, per below)
 
 **Interfaces:**
-- Consumes: `buildAuthorizeUrl`, `exchangeCodeForTokens` (Task 2), `setStoredRefreshToken` (Task 3).
+- Consumes: `buildAuthorizeUrl`, `exchangeCodeForTokens` (Task 2), `setStoredRefreshToken` (Task 3), `findByKey`/`numberedEntries` (Task 4's `lib/yahooJson.ts` — reuse these, do not redefine them here).
 - Produces: `parseLeagueTeamKeys(rawJson: unknown): Array<{ leagueKey: string; leagueName: string; teamKey: string; teamName: string }>` (pure, unit-tested), plus an interactive `main()` that is run manually, not unit tested (it does readline I/O and live network calls by design).
 
 This script is run once, locally, by a human — not deployed. Its job: get the first refresh token, and print the league/team keys needed for `YAHOO_LEAGUE_KEY` and `YAHOO_MY_TEAM_KEY`.
@@ -1255,30 +1302,7 @@ Expected: FAIL — module does not exist.
 import * as readline from 'node:readline/promises'
 import { buildAuthorizeUrl, exchangeCodeForTokens } from '../lib/yahoo.js'
 import { setStoredRefreshToken } from '../lib/storage.js'
-
-function findByKey(node: unknown, key: string): unknown {
-  if (node === null || typeof node !== 'object') return undefined
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      const found = findByKey(item, key)
-      if (found !== undefined) return found
-    }
-    return undefined
-  }
-  const record = node as Record<string, unknown>
-  if (key in record) return record[key]
-  for (const value of Object.values(record)) {
-    const found = findByKey(value, key)
-    if (found !== undefined) return found
-  }
-  return undefined
-}
-
-function numberedValues(container: Record<string, unknown>): unknown[] {
-  return Object.entries(container)
-    .filter(([key]) => key !== 'count')
-    .map(([, value]) => value)
-}
+import { findByKey, numberedEntries } from '../lib/yahooJson.js'
 
 export interface LeagueTeamKey {
   leagueKey: string
@@ -1291,13 +1315,13 @@ export function parseLeagueTeamKeys(rawJson: unknown): LeagueTeamKey[] {
   const leaguesContainer = findByKey(rawJson, 'leagues') as Record<string, unknown> | undefined
   if (!leaguesContainer) return []
 
-  return numberedValues(leaguesContainer).map((leagueWrapper) => {
+  return numberedEntries(leaguesContainer).map((leagueWrapper) => {
     const leagueArray = (leagueWrapper as { league: unknown[] }).league
     const leagueKey = findByKey(leagueArray, 'league_key') as string
     const leagueName = findByKey(leagueArray, 'name') as string
 
     const teamsContainer = findByKey(leagueArray, 'teams') as Record<string, unknown>
-    const firstTeamWrapper = numberedValues(teamsContainer)[0]
+    const firstTeamWrapper = numberedEntries(teamsContainer)[0]
     const teamArray = (firstTeamWrapper as { team: unknown[] }).team
     const teamKey = findByKey(teamArray, 'team_key') as string
     const teamName = findByKey(teamArray, 'name') as string
