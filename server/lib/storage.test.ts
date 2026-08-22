@@ -4,12 +4,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const putMock = vi.fn()
 const headMock = vi.fn()
 
-vi.mock('@vercel/blob', () => ({
-  put: (...args: unknown[]) => putMock(...args),
-  head: (...args: unknown[]) => headMock(...args),
-}))
+vi.mock('@vercel/blob', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@vercel/blob')>()
+  return {
+    ...actual,
+    put: (...args: unknown[]) => putMock(...args),
+    head: (...args: unknown[]) => headMock(...args),
+  }
+})
 
 // Imported after the mock so storage.ts picks up the mocked module.
+const { BlobNotFoundError } = await import('@vercel/blob')
 const { getStoredRefreshToken, setStoredRefreshToken, getLatestStandings, setLatestStandings } =
   await import('./storage.js')
 
@@ -55,7 +60,7 @@ describe('refresh token storage', () => {
   })
 
   it('getStoredRefreshToken returns null if the blob does not exist yet', async () => {
-    headMock.mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }))
+    headMock.mockRejectedValue(new BlobNotFoundError())
 
     const result = await getStoredRefreshToken()
 
@@ -86,7 +91,7 @@ describe('standings storage', () => {
   })
 
   it('getLatestStandings returns null if not yet written', async () => {
-    headMock.mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }))
+    headMock.mockRejectedValue(new BlobNotFoundError())
 
     const result = await getLatestStandings()
 

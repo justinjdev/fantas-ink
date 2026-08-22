@@ -1,5 +1,5 @@
 // server/lib/storage.ts
-import { put, head } from '@vercel/blob'
+import { put, head, BlobNotFoundError } from '@vercel/blob'
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto'
 import type { StandingsPayload } from './transform.js'
 
@@ -12,7 +12,11 @@ const AUTH_TAG_LENGTH = 16
 function getEncryptionKey(): Buffer {
   const key = process.env.TOKEN_ENCRYPTION_KEY
   if (!key) throw new Error('TOKEN_ENCRYPTION_KEY is not set')
-  return Buffer.from(key, 'base64')
+  const decoded = Buffer.from(key, 'base64')
+  if (decoded.length !== 32) {
+    throw new Error('TOKEN_ENCRYPTION_KEY must decode to exactly 32 bytes')
+  }
+  return decoded
 }
 
 // IV || authTag || ciphertext, base64-encoded as a single string.
@@ -34,6 +38,7 @@ function decrypt(encoded: string): string {
 }
 
 function isNotFound(err: unknown): boolean {
+  if (err instanceof BlobNotFoundError) return true
   return typeof err === 'object' && err !== null && 'status' in err && (err as { status: number }).status === 404
 }
 
@@ -59,6 +64,7 @@ export async function setStoredRefreshToken(token: string): Promise<void> {
     access: 'public',
     contentType: 'application/json',
     cacheControlMaxAge: 0,
+    addRandomSuffix: false,
   })
 }
 
@@ -71,5 +77,6 @@ export async function setLatestStandings(payload: StandingsPayload): Promise<voi
     access: 'public',
     contentType: 'application/json',
     cacheControlMaxAge: 0,
+    addRandomSuffix: false,
   })
 }
