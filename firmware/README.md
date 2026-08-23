@@ -2,7 +2,18 @@
 
 ## Toolchain
 
-- `arduino-cli` (installed via `brew install arduino-cli`) — 1.5.1
+```bash
+brew install arduino-cli
+arduino-cli config init
+arduino-cli core update-index
+arduino-cli core install esp32:esp32
+arduino-cli lib install GxEPD2
+arduino-cli lib install ArduinoJson
+```
+
+Pinned versions this project was built and verified against:
+
+- `arduino-cli` — 1.5.1
 - Core: `esp32:esp32` — 3.3.11
 - Libraries: `GxEPD2` (>= 1.6.0 — see design spec for why) — 1.6.9, `ArduinoJson` (^7) — 7.4.3
 
@@ -62,7 +73,7 @@ the log lines the firmware prints.
 1. **Happy path:** power on with good WiFi and a reachable `/api/standings`. Expect `WiFi connected`, a `Budget: <n> ms remaining for fetch` line, and `Data source: fresh fetch (<n> rows)`. Confirm the table renders with correct ranks/names/records, the gap divider appears in the right place, and your own team's row is visually highlighted.
 2. **WiFi failure:** temporarily wrong `WIFI_PASSWORD` in `secrets.h`. Expect `WiFi connect failed` after ~30s (not hanging), then the display and sleep lines below — the device must deep-sleep rather than staying awake.
 3. **API failure with a cache present:** after a successful run (so NVS has cached data), block `STANDINGS_URL` (e.g. wrong `SHARED_TOKEN` temporarily) and expect `Fetch: attempt 1 failed with status 401` followed immediately by `Data source: NVS cache (<n> rows)` — note a 401 is deliberately not retried. Confirm the display shows the previously-cached standings with a "Last updated: ..." footer, not a blank/garbage screen.
-4. **Cold start, no cache, API failure:** erase flash (`arduino-cli upload` after `esptool.py erase_flash`, or hold BOOT during a fresh flash) so NVS is empty, then run with a broken `STANDINGS_URL`. Expect `Data source: none — rendering 'No data yet'` and the "No data yet" message on the panel instead of a blank screen.
-5. **Panel care:** confirm `Display: hibernating panel` appears at the end of every path above, including the WiFi-failure path in step 2. This is the last thing logged before the sleep lines, so its absence means `hibernate()` was skipped.
-6. **Time budget:** in step 3, confirm the whole wake cycle stays within ~60s. If retries run long you will see `Fetch: time budget exhausted, giving up`; that line is the budget working as intended, not a failure.
+4. **Network blackhole / time budget:** point `STANDINGS_URL` at an address that will not respond at all rather than reject the request — e.g. `https://192.0.2.1/api/standings` (`192.0.2.0/24` is reserved for documentation/testing and guaranteed unroutable) — so each attempt has to run out its connect/handshake timeout instead of failing fast. Expect one or more `Fetch: attempt N failed with status -1` lines (or similar connect-failure status), then `Fetch: time budget exhausted, giving up` once no further attempt could finish within the wake-cycle budget — confirm that line appears and the whole cycle still ends in a deep sleep within roughly a minute, not a hang.
+5. **Cold start, no cache, API failure:** erase flash (`arduino-cli upload` after `esptool.py erase_flash`, or hold BOOT during a fresh flash) so NVS is empty, then run with a broken `STANDINGS_URL`. Expect `Data source: none, rendering 'No data yet'` and the "No data yet" message on the panel instead of a blank screen.
+6. **Panel care:** confirm `Display: hibernating panel` appears at the end of every path above, including the WiFi-failure path in step 2. This is the last thing logged before the sleep lines, so its absence means `hibernate()` was skipped.
 7. **Sleep duration sanity:** the last two lines of every run are one of `Sleep: clock synced, scheduling next 8am wake` / `Sleep: clock never synced, using 1h retry fallback`, then `Sleep: sleepMicros=<n> (<h> hours)`. Confirm the value is in a sane range (never near-zero or absurdly large) for a couple of different times-of-day. **Exactly 1.00 hours is legitimate, not a bug:** it is the clock-never-synced fallback, and the preceding line tells you which branch produced the value. With a synced clock expect a few hours up to ~24h depending on time-of-day.

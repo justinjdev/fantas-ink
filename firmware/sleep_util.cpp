@@ -1,7 +1,8 @@
 #include "sleep_util.h"
 
 uint64_t computeSleepMicros(time_t now, int wakeHour, int wakeMinute) {
-  struct tm target = *localtime(&now);
+  struct tm target;
+  localtime_r(&now, &target); // reentrant — localtime() uses a shared static buffer
   target.tm_hour = wakeHour;
   target.tm_min = wakeMinute;
   target.tm_sec = 0;

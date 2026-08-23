@@ -71,10 +71,19 @@ FetchResult parseStandingsJson(const String& payload) {
   if (result.rows.empty()) return FetchResult{};
 
   result.asOf = doc["asOf"].as<String>();
+  if (result.asOf.length() == 0) return FetchResult{};
+
   result.rawJson = payload;
   result.success = true;
   return result;
 }
+
+// Worst case a single started attempt can take: connect timeout + handshake
+// timeout (the request/response itself is a few KB of JSON, negligible next
+// to these). An attempt is only started if it could still finish by
+// deadlineMs even at this worst case — otherwise the loop would check the
+// deadline between attempts but let an in-flight one overrun it.
+static const uint32_t MAX_ATTEMPT_DURATION_MS = 5000 + 10000;
 
 FetchResult fetchStandings(const char* url, const char* sharedToken, int maxRetries, uint32_t backoffBaseMs,
                            uint32_t deadlineMs) {
@@ -82,7 +91,7 @@ FetchResult fetchStandings(const char* url, const char* sharedToken, int maxRetr
     // Checked before every attempt, the first included: without this the
     // core's default 120s handshake timeout times maxRetries can hold the
     // device awake for minutes past the wake-cycle budget.
-    if ((int32_t)(millis() - deadlineMs) >= 0) {
+    if ((int32_t)(millis() + MAX_ATTEMPT_DURATION_MS - deadlineMs) >= 0) {
       Serial.println("Fetch: time budget exhausted, giving up");
       break;
     }

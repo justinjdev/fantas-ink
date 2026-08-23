@@ -30,10 +30,10 @@ struct FetchResult {
 // Parses a standings JSON payload (as returned by /api/standings, or a
 // cached copy of one) into StandingsRow entries. Exposed separately from
 // fetchStandings so the cached-fallback path can reuse it without an
-// HTTP round-trip. A payload that parses as JSON but yields no rows is
-// treated as a failure (success == false) — a real standings response
-// always carries rows, so an empty one is an error body, not data worth
-// caching or rendering.
+// HTTP round-trip. A payload that parses as JSON but yields no rows, or is
+// missing `asOf`, is treated as a failure (success == false) — a real
+// standings response always carries both, so a payload missing either is
+// an error body, not data worth caching or rendering.
 FetchResult parseStandingsJson(const String& payload);
 
 // GETs `url` with `sharedToken` as the `?token=` query param, over HTTPS
@@ -43,8 +43,9 @@ FetchResult parseStandingsJson(const String& payload);
 // succeed on retry).
 //
 // `deadlineMs` is a wall-clock deadline on the `millis()` timebase (i.e.
-// callers pass `millis() + remainingBudget`). No attempt is started once
-// `millis()` has reached it, including the first — this is what keeps the
-// retry loop inside the wake-cycle time budget.
+// callers pass `millis() + remainingBudget`). No attempt is started unless
+// it could still finish by `deadlineMs` even at its own worst-case duration
+// (connect + handshake timeout) — not just started before the deadline —
+// so a started attempt can't itself carry the loop past the budget.
 FetchResult fetchStandings(const char* url, const char* sharedToken, int maxRetries, uint32_t backoffBaseMs,
                            uint32_t deadlineMs);

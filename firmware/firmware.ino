@@ -84,7 +84,7 @@ void setup() {
       // Covers both "never fetched anything" and "cache present but empty or
       // corrupt" — rendering the latter would leave a blank page with a bare
       // "Last updated: " footer.
-      Serial.println("Data source: none — rendering 'No data yet'");
+      Serial.println("Data source: none, rendering 'No data yet'");
       renderMessage(display, "No data yet");
     }
   }
