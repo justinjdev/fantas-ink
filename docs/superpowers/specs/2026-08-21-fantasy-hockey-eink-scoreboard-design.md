@@ -132,10 +132,16 @@ day to day, and needs real margin against the cron write it depends on.
   accurate over long deep-sleep periods; it must complete before the HTTPS
   fetch below, since TLS certificate validity checks depend on a correct
   system clock.
-- `GET`s `/api/standings` over HTTPS (root CA pinned to ISRG Root X1 — the
-  Let's Encrypt / Vercel-served root — not a leaf/intermediate cert, so the
-  device doesn't brick itself at the next routine cert rotation) with retry
-  (3x, backoff) on failure.
+- `GET`s `/api/standings` over HTTPS (root CA pinned — not a leaf/intermediate
+  cert, so the device doesn't brick itself at the next routine cert rotation
+  — to **both** ISRG Root X1 and GTS Root R1, concatenated. This spec
+  originally claimed Vercel serves a Let's Encrypt/ISRG-rooted chain; that
+  was wrong, caught during the firmware's final review by querying the live
+  deployment directly with `openssl s_client`, which showed a Google Trust
+  Services chain rooted at GTS Root R1 instead. Both roots are pinned
+  together so a future Vercel CA change doesn't require a reflash) with
+  retry (3x, backoff, skipping retries on 401 since a bad token won't
+  succeed on a second attempt) on failure.
 - On success: renders the JSON to the display, writes it + timestamp to flash
   (NVS) as last-known-good.
 - On failure after retries: renders the cached last-known-good data with a
