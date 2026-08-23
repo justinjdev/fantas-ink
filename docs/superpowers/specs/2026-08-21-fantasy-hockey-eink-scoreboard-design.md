@@ -2,18 +2,35 @@
 
 ## Overview
 
-A Waveshare 4.2" e-paper display (400x300), driven by a Waveshare Universal e-Paper
-Driver Board (ESP32 onboard), wakes once a day at 8am to show the current Yahoo
+A Waveshare 4.2" e-paper display (400x300), driven by the Waveshare ESP32
+e-Paper Driver Board (a standalone board with the ESP32 onboard, not the
+Raspberry Pi/Jetson HAT of a similar name), wakes once a day at 8am to show the current Yahoo
 Fantasy Hockey league standings: top 3 teams plus a window around the user's own
 team, then deep sleeps until the next day.
 
 ## Hardware
 
-- **MCU:** ESP32 (Waveshare Universal e-Paper Driver Board)
+- **MCU:** ESP32 (Waveshare ESP32 e-Paper Driver Board)
 - **Display:** Waveshare 4.2" e-Paper, 400x300, raw SPI panel
 - **Display library:** GxEPD2 (Adafruit_GFX rendering)
-- **Pinout:** to be confirmed against Waveshare's driver board wiki/schematic during
-  implementation. Do not reuse pin numbers from unrelated board/panel combinations.
+- **Pinout:** confirmed against Waveshare's ESP32 e-Paper Driver Board wiki and
+  GxEPD2's own `ConnectingHardware.md` (the library this project uses), which agree:
+
+  | Signal | GPIO |
+  |---|---|
+  | BUSY | 25 |
+  | RST | 26 |
+  | DC | 27 |
+  | CS | 15 |
+  | CLK/SCK | 13 |
+  | DIN/MOSI | 14 |
+
+  These are non-standard SPI pins — GxEPD2's docs note this board "requires
+  re-mapping of HW SPI to these pins in `SPIClass`" rather than using the ESP32's
+  default VSPI pins. `network_api.cpp`'s display init must construct a remapped
+  `SPIClass` (see GxEPD2's example sketch `GxEPD2_WS_ESP32_Driver.ino` for the
+  pattern) before handing it to the GxEPD2 driver — a plain `SPI.begin()` will not
+  work on this board.
 
 ## Architecture
 
