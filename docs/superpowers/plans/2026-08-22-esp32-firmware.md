@@ -31,7 +31,7 @@ Copied from `docs/superpowers/specs/2026-08-21-fantasy-hockey-eink-scoreboard-de
 
 This plan splits the design spec's single `display_layout.h/.cpp` into two files, per the spec's own testing guidance (pure layout logic vs. hardware drawing calls are different testability classes and belong in different files):
 
-- `firmware/fantasy_hockey_scoreboard.ino` — `setup()`/`loop()`: orchestrates one wake cycle end-to-end, computes next sleep duration, deep-sleeps. `loop()` is never reached.
+- `firmware/firmware.ino` — `setup()`/`loop()`: orchestrates one wake cycle end-to-end, computes next sleep duration, deep-sleeps. `loop()` is never reached.
 - `firmware/secrets.h.example` — template for WiFi creds, standings URL, shared token, TZ string. `firmware/secrets.h` (gitignored) holds the real values.
 - `firmware/.gitignore` — excludes `secrets.h` and build output.
 - `firmware/root_ca.h` — pinned ISRG Root X1 certificate for TLS.
@@ -52,7 +52,7 @@ This plan splits the design spec's single `display_layout.h/.cpp` into two files
 - Create: `firmware/.gitignore`
 - Create: `firmware/secrets.h.example`
 - Create: `firmware/root_ca.h`
-- Create: `firmware/fantasy_hockey_scoreboard.ino`
+- Create: `firmware/firmware.ino`
 - Create: `firmware/README.md`
 
 **Interfaces:**
@@ -174,7 +174,7 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 )EOF";
 ```
 
-- [ ] **Step 7: Write a minimal `firmware/fantasy_hockey_scoreboard.ino` stub**
+- [ ] **Step 7: Write a minimal `firmware/firmware.ino` stub**
 
 ```cpp
 void setup() {
@@ -224,7 +224,7 @@ Find `<serial-port>` via `arduino-cli board list` with the board plugged in. Dep
 - [ ] **Step 10: Commit**
 
 ```bash
-git add firmware/.gitignore firmware/secrets.h.example firmware/root_ca.h firmware/fantasy_hockey_scoreboard.ino firmware/README.md
+git add firmware/.gitignore firmware/secrets.h.example firmware/root_ca.h firmware/firmware.ino firmware/README.md
 git commit -m "chore: scaffold firmware project and pin toolchain versions"
 ```
 
@@ -918,7 +918,7 @@ git commit -m "feat: add WiFi/NTP/HTTPS network layer with retry and pinned TLS"
 ### Task 7: Orchestration, final wiring, and README
 
 **Files:**
-- Modify: `firmware/fantasy_hockey_scoreboard.ino` (replaces Task 1's stub)
+- Modify: `firmware/firmware.ino` (replaces Task 1's stub)
 - Modify: `firmware/README.md` (adds wiring reference and manual verification checklist)
 
 **Interfaces:**
@@ -928,7 +928,7 @@ git commit -m "feat: add WiFi/NTP/HTTPS network layer with retry and pinned TLS"
 - [ ] **Step 1: Write the full orchestration sketch**
 
 ```cpp
-// firmware/fantasy_hockey_scoreboard.ino
+// firmware/firmware.ino
 #include "secrets.h"
 #include "sleep_util.h"
 #include "display_layout.h"
@@ -1039,6 +1039,6 @@ and after any change to `network_api.cpp` or `display_render.cpp`:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add firmware/fantasy_hockey_scoreboard.ino firmware/README.md
+git add firmware/firmware.ino firmware/README.md
 git commit -m "feat: wire up firmware orchestration and finalize README"
 ```
