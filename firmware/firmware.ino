@@ -12,11 +12,21 @@ static const uint32_t WIFI_TIMEOUT_MS = 30000;
 static const uint32_t WAKE_CYCLE_BUDGET_MS = 60000;
 static const int FETCH_MAX_RETRIES = 3;
 static const uint32_t FETCH_BACKOFF_BASE_MS = 2000;
+static const uint64_t FALLBACK_RETRY_SLEEP_MICROS = 60ULL * 60 * 1000000ULL;
+static const time_t PLAUSIBLE_TIME_THRESHOLD = 1700000000;  // matches network_api.cpp's NTP sync-wait heuristic
 
 static void goToSleep() {
   time_t now;
   time(&now);
-  uint64_t sleepMicros = computeSleepMicros(now, WAKE_HOUR, WAKE_MINUTE);
+  uint64_t sleepMicros;
+  if (now < PLAUSIBLE_TIME_THRESHOLD) {
+    // Clock was never synced this boot (WiFi/NTP failure, or first boot with no
+    // battery-backed RTC), so computeSleepMicros() would target 8am relative to
+    // a near-epoch timestamp. Retry sooner instead.
+    sleepMicros = FALLBACK_RETRY_SLEEP_MICROS;
+  } else {
+    sleepMicros = computeSleepMicros(now, WAKE_HOUR, WAKE_MINUTE);
+  }
   esp_sleep_enable_timer_wakeup(sleepMicros);
   esp_deep_sleep_start();
 }
