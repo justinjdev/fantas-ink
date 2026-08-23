@@ -41,18 +41,22 @@ void setup() {
   // Bound by reference — Display embeds a ~15KB framebuffer that will not fit
   // on loopTask's 8192-byte stack. See display_render.h.
   Display& display = initDisplay();
+  renderMessage(display, "Booting...");
 
   bool haveFreshData = false;
   FetchResult data;
 
+  renderMessage(display, "Connecting WiFi...");
   if (connectWiFi(WIFI_SSID, WIFI_PASSWORD, WIFI_TIMEOUT_MS)) {
     Serial.println("WiFi connected");
+    renderMessage(display, "Syncing time...");
     syncTime(TZ_STRING);
 
     uint32_t elapsed = millis() - cycleStart;
     uint32_t remainingBudget = elapsed > WAKE_CYCLE_BUDGET_MS ? 0 : WAKE_CYCLE_BUDGET_MS - elapsed;
     Serial.printf("Budget: %lu ms remaining for fetch\n", (unsigned long)remainingBudget);
     if (remainingBudget > 0) {
+      renderMessage(display, "Fetching standings...");
       data = fetchStandings(STANDINGS_URL, SHARED_TOKEN, FETCH_MAX_RETRIES, FETCH_BACKOFF_BASE_MS,
                             millis() + remainingBudget);
       if (data.success) {
@@ -64,6 +68,7 @@ void setup() {
     }
   } else {
     Serial.println("WiFi connect failed");
+    renderMessage(display, "WiFi connect failed");
   }
 
   if (haveFreshData) {
