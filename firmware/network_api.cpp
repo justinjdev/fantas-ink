@@ -7,6 +7,24 @@
 #include <ArduinoJson.h>
 #include "root_ca.h"
 
+const time_t PLAUSIBLE_TIME_THRESHOLD = 1700000000;
+
+// WiFiClientSecure::setCACert() stores the pointer it is given without
+// copying, and mbedtls wants both PEM roots in one contiguous buffer, so the
+// concatenation lives in static storage and is built once. The PROGMEM reads
+// go through memcpy_P rather than String concatenation, which would ignore
+// the PROGMEM attribute on cores where it is not a no-op.
+static const char* rootCaBundle() {
+  static char bundle[sizeof(ISRG_ROOT_X1) + sizeof(GTS_ROOT_R1) - 1];
+  static bool built = false;
+  if (!built) {
+    memcpy_P(bundle, ISRG_ROOT_X1, sizeof(ISRG_ROOT_X1) - 1);
+    memcpy_P(bundle + sizeof(ISRG_ROOT_X1) - 1, GTS_ROOT_R1, sizeof(GTS_ROOT_R1));
+    built = true;
+  }
+  return bundle;
+}
+
 bool connectWiFi(const char* ssid, const char* password, uint32_t timeoutMs) {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -24,7 +42,7 @@ void syncTime(const char* tzString) {
   uint32_t start = millis();
   // Wait for a plausible post-2023 timestamp, capped at 15s so a slow/dead
   // NTP server can't blow the overall wake-cycle time budget.
-  while (now < 1700000000 && millis() - start < 15000) {
+  while (now < PLAUSIBLE_TIME_THRESHOLD && millis() - start < 15000) {
     delay(200);
     time(&now);
   }
@@ -50,18 +68,32 @@ FetchResult parseStandingsJson(const String& payload) {
     }
     result.rows.push_back(row);
   }
+  if (result.rows.empty()) return FetchResult{};
+
   result.asOf = doc["asOf"].as<String>();
   result.rawJson = payload;
   result.success = true;
   return result;
 }
 
-FetchResult fetchStandings(const char* url, const char* sharedToken, int maxRetries, uint32_t backoffBaseMs) {
+FetchResult fetchStandings(const char* url, const char* sharedToken, int maxRetries, uint32_t backoffBaseMs,
+                           uint32_t deadlineMs) {
   for (int attempt = 1; attempt <= maxRetries; attempt++) {
+    // Checked before every attempt, the first included: without this the
+    // core's default 120s handshake timeout times maxRetries can hold the
+    // device awake for minutes past the wake-cycle budget.
+    if ((int32_t)(millis() - deadlineMs) >= 0) {
+      Serial.println("Fetch: time budget exhausted, giving up");
+      break;
+    }
+
     WiFiClientSecure client;
-    client.setCACert(ISRG_ROOT_X1);
+    client.setCACert(rootCaBundle());
+    client.setHandshakeTimeout(10);  // seconds
 
     HTTPClient http;
+    http.setConnectTimeout(5000);  // milliseconds
+    http.setTimeout(5000);
     String fullUrl = String(url) + "?token=" + sharedToken;
     if (http.begin(client, fullUrl)) {
       int status = http.GET();
@@ -70,9 +102,16 @@ FetchResult fetchStandings(const char* url, const char* sharedToken, int maxRetr
         http.end();
         FetchResult result = parseStandingsJson(payload);
         if (result.success) return result;
+        Serial.println("Fetch: HTTP 200 but payload did not parse");
       } else {
         http.end();
+        Serial.printf("Fetch: attempt %d failed with status %d\n", attempt, status);
+        // A rejected token is not a transient failure — retrying only burns
+        // the remaining time budget.
+        if (status == 401) return FetchResult{};
       }
+    } else {
+      Serial.printf("Fetch: attempt %d could not build request\n", attempt);
     }
     if (attempt < maxRetries) delay(backoffBaseMs * attempt);
   }

@@ -14,9 +14,14 @@ static const int PIN_SPI_MOSI = 14;
 
 static SPIClass hspi(HSPI);
 
-Display initDisplay() {
+// The Display object embeds a ~15KB framebuffer as a member array, which is
+// larger than loopTask's 8192-byte stack (ARDUINO_LOOP_STACK_SIZE). It must
+// live in static storage, and initDisplay() must hand back a reference —
+// returning by value would put a copy right back on the caller's stack.
+static Display display(GxEPD2_420_GDEY042T81(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY));
+
+Display& initDisplay() {
   hspi.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_EPD_CS);
-  Display display(GxEPD2_420_GDEY042T81(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY));
   display.epd2.selectSPI(hspi, SPISettings(4000000, MSBFIRST, SPI_MODE0));
   display.init(115200);
   display.setRotation(0);
