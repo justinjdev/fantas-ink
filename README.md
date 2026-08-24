@@ -1,16 +1,30 @@
 # Fantasy Hockey E-Ink Scoreboard
 
-A Waveshare 7.5" e-paper display (800×480), always-on wall power, that wakes
-once a day at ~8am to show the current Yahoo Fantasy Hockey league standings —
-top of the table, a window around your own team, a playoff-line divider, and
-a this-week/last-week/next-week matchup sidebar — then deep sleeps until the
-next day. A physical button toggles to a second page with a full head-to-head
-category breakdown for the current matchup. Confirmed working on real
-hardware.
+An e-paper display that shows your Yahoo Fantasy Hockey standings. Built on a Waveshare 7.5" panel (800×480) and an ESP32.
 
-| Page 1 — standings + matchup summary | Page 2 — category breakdown |
+It wakes up once a day, around 8am. It shows:
+
+- The top of the standings table
+- A window around your own team
+- A line marking the playoff cutoff
+- Your matchups: this week, last week, next week
+
+Then it goes back to sleep.
+
+Press the button to flip to page 2. That page breaks down every stat category for your current matchup.
+
+| Page 1: standings + matchups | Page 2: category breakdown |
 |---|---|
 | ![Page 1: standings table with playoff line and a this-week/last-week/next-week matchup sidebar](firmware/docs/images/page1-standings.png) | ![Page 2: head-to-head category breakdown with leader markers](firmware/docs/images/page2-categories.png) |
+
+## What you'll need
+
+- [Waveshare ESP32 e-Paper Driver Board](https://www.waveshare.com/e-paper-esp32-driver-board.htm) (has the ESP32 and USB-serial chip built in)
+- [Waveshare 7.5" e-Paper raw panel](https://www.waveshare.com/7.5inch-e-paper.htm), 800×480, GDEY075T7 generation, with its 24-pin FFC cable
+- A momentary push button
+- A USB cable, for power and flashing
+
+Full wiring details are in [firmware/README.md](firmware/README.md).
 
 ## How it fits together
 
@@ -20,22 +34,15 @@ Yahoo Fantasy API  →  server/  (Vercel, daily cron)  →  Vercel Blob (latest.
                                             firmware/  (ESP32 + e-paper panel)
 ```
 
-- **`server/`** — a Vercel-hosted TypeScript backend. A daily cron job pulls
-  standings and matchup data from the Yahoo Fantasy API, transforms it, and
-  publishes it to Vercel Blob. The ESP32 fetches from `/api/standings` on its
-  own daily wake cycle. See [`server/README.md`](server/README.md) for setup
-  (Yahoo app registration, env vars, deployment).
-- **`firmware/`** — the ESP32 Arduino sketch that fetches the published
-  standings, renders both pages via GxEPD2, and manages deep sleep, NVS
-  caching for offline fallback, and the page-toggle button. See
-  [`firmware/README.md`](firmware/README.md) for the toolchain, build/flash
-  steps, wiring reference, and manual verification checklist.
-- **`docs/`** — design specs and implementation plans for both halves of the
-  project.
+Two pieces.
+
+**server/** runs on Vercel. A daily cron job pulls standings and matchup data from Yahoo, reshapes it, and saves it to Vercel Blob. The ESP32 reads that file once a day. Setup steps (Yahoo app registration, env vars, deploy) are in [server/README.md](server/README.md).
+
+**firmware/** is the ESP32 sketch. It fetches the saved standings, draws both pages with GxEPD2, and handles deep sleep, offline caching, and the button. Build and flash steps are in [firmware/README.md](firmware/README.md).
+
+`docs/` holds the design specs and plans for both pieces.
 
 ## Getting started
 
-1. Set up and deploy the server first (`server/README.md`) — the firmware
-   needs a live `/api/standings` endpoint to fetch from.
-2. Build and flash the firmware (`firmware/README.md`), pointing `secrets.h`
-   at your deployed server URL and shared token.
+1. Deploy the server first. The firmware needs a live `/api/standings` endpoint to talk to.
+2. Build and flash the firmware. Point `secrets.h` at your server URL and shared token.
