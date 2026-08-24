@@ -938,14 +938,21 @@ function makeMatchupTeam(teamKey: string, name: string, statValues: Record<strin
   }
 }
 
-function makeMatchup(week: number, status: string, myStats: Record<string, string>, theirStats: Record<string, string>) {
+function makeMatchup(
+  week: number,
+  status: string,
+  myStats: Record<string, string>,
+  theirStats: Record<string, string>,
+  opponentName = 'Puck Norris',
+  opponentTeamKey = '453.l.1.t.2',
+) {
   return {
     matchup: {
       week: String(week),
       status,
       teams: {
         '0': { team: makeMatchupTeam('453.l.1.t.8', 'Cellar Dwellers', myStats).team },
-        '1': { team: makeMatchupTeam('453.l.1.t.2', 'Puck Norris', theirStats).team },
+        '1': { team: makeMatchupTeam(opponentTeamKey, opponentName, theirStats).team },
         count: 2,
       },
     },
@@ -999,14 +1006,16 @@ describe('parseMatchups', () => {
 
   it('builds the next matchup from the soonest preevent entry, with no status or tally', () => {
     const raw = makeRawMatchups({
-      '0': makeMatchup(22, 'preevent', {}, {}),
-      '1': makeMatchup(21, 'preevent', {}, {}),
+      '0': makeMatchup(22, 'preevent', {}, {}, 'Later Opponent', '453.l.1.t.5'),
+      '1': makeMatchup(21, 'preevent', {}, {}, 'Sooner Opponent', '453.l.1.t.3'),
     })
 
     const result = parseMatchups(raw, '453.l.1.t.8', CATEGORIES)
 
     // Week 21 is sooner than week 22 — must pick that one.
-    expect(result.next).toEqual({ opponent: 'Puck Norris', opponentTeamKey: '453.l.1.t.2' })
+    // Distinct opponents per week: if the code took container order (week 22) instead of
+    // sorting to the soonest week, this assertion would fail loudly rather than pass by accident.
+    expect(result.next).toEqual({ opponent: 'Sooner Opponent', opponentTeamKey: '453.l.1.t.3' })
   })
 
   it('returns null for any matchup state with no matching entry, not a throw', () => {
@@ -1329,29 +1338,12 @@ import { sanitizeAscii } from './asciiSanitize.js'
 
 (inside `parseMatchupTeam`, replacing the existing unsanitized assignment)
 
-In `server/lib/matchup.test.ts`, give `makeMatchup` an optional trailing opponent-name parameter so
-the non-ASCII name can be built into the fixture. Mutating the constructed object after the fact
-(`raw.fantasy_content.team[1].matchups['0']...`) does not typecheck — TypeScript widens
-`fantasy_content.team` to a union that includes the array branch, so the property access is
-`error TS2339`, and `tsconfig.json` includes `lib`/`api`, so test files are typechecked.
-
-```typescript
-function makeMatchup(
-  week: number,
-  status: string,
-  myStats: Record<string, string>,
-  theirStats: Record<string, string>,
-  opponentName = 'Puck Norris',
-) {
-```
-
-and inside it, pass `opponentName` through in place of the hardcoded `'Puck Norris'`:
-
-```typescript
-        '1': { team: makeMatchupTeam('453.l.1.t.2', opponentName, theirStats).team },
-```
-
-Every existing call site keeps working unchanged via the default. Then add:
+In `server/lib/matchup.test.ts`, build the non-ASCII name into the fixture via `makeMatchup`'s
+existing optional `opponentName` parameter (added in Task 9). Do **not** mutate the constructed
+object after the fact (`raw.fantasy_content.team[1].matchups['0']...`) — that does not typecheck,
+since TypeScript widens `fantasy_content.team` to a union including the array branch, making the
+property access `error TS2339`, and `tsconfig.json` includes `lib`/`api`, so test files are
+typechecked. Add:
 
 ```typescript
   it('sanitizes non-ASCII characters out of the opponent name', () => {
