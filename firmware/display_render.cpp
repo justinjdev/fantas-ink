@@ -10,6 +10,7 @@
 #include <Fonts/FreeSansBold24pt7b.h>
 #include <Fonts/FreeMono9pt7b.h>
 #include <Fonts/FreeMono12pt7b.h>
+#include <Fonts/FreeMonoBold9pt7b.h>
 #include <Fonts/FreeMonoBold12pt7b.h>
 #include <Fonts/FreeMonoBold18pt7b.h>
 
@@ -61,17 +62,30 @@ Display& initDisplay() {
   return display;
 }
 
-constexpr size_t MAX_LEAGUE_NAME_CHARS = 24;
-constexpr size_t MAX_OPPONENT_NAME_CHARS = 14; // provisional - confirm against real hardware
+static int textWidth(Display& display, const std::string& text) {
+  int16_t tbx, tby;
+  uint16_t tbw, tbh;
+  display.getTextBounds(text.c_str(), 0, 0, &tbx, &tby, &tbw, &tbh);
+  return static_cast<int>(tbw);
+}
 
-static std::string truncateToFit(const std::string& text, size_t maxChars) {
-  return text.size() > maxChars ? text.substr(0, maxChars) : text;
+// getTextBounds measures against whatever font is currently set on the display,
+// so every caller must setFont() to the font that will actually draw the string
+// BEFORE calling this — measuring with the wrong font fails silently.
+static std::string truncateToWidth(Display& display, const std::string& text, int maxWidth) {
+  if (textWidth(display, text) <= maxWidth) return text;
+  std::string out = text;
+  while (!out.empty()) {
+    out.pop_back();
+    if (textWidth(display, out) <= maxWidth) break;
+  }
+  return out;
 }
 
 static void drawStandingsTable(Display& display, const std::vector<LayoutRow>& rows,
                                 bool hasPlayoffTeams, int playoffTeams) {
   const int top = 74, rowH = 40;
-  const int rankX = 20, teamX = 56, wltX = 235, pctX = 315, strkX = 385;
+  const int rankX = 20, teamX = 56, wltX = 235, pctX = 335, strkX = 400;
 
   int y = top;
   bool prevWasGap = false;
@@ -98,8 +112,8 @@ static void drawStandingsTable(Display& display, const std::vector<LayoutRow>& r
     display.setFont(&FreeMonoBold12pt7b);
     printAligned(display, std::to_string(row.rank), rankX, baseline);
     display.setFont(&FreeSansBold12pt7b);
-    printAligned(display, row.displayName, teamX, baseline);
-    display.setFont(row.isMe ? &FreeMonoBold12pt7b : &FreeMono12pt7b);
+    printAligned(display, truncateToWidth(display, row.displayName, 175), teamX, baseline);
+    display.setFont(row.isMe ? &FreeMonoBold9pt7b : &FreeMono9pt7b);
     printAligned(display, std::to_string(row.wins) + "-" + std::to_string(row.losses) + "-" + std::to_string(row.ties), wltX, baseline);
     printAligned(display, row.winPct, pctX, baseline);
     printAligned(display, row.streak, strkX, baseline);
@@ -115,7 +129,7 @@ static void drawMatchupBlock(Display& display, int topY, int bottomY, const char
   const int sx = 484;
   const int midY = (topY + bottomY) / 2;
   const int eyebrowOffset = 20;
-  const std::string oppNameFit = truncateToFit(oppName, MAX_OPPONENT_NAME_CHARS);
+  const int nameBudget = 296; // sidebar x=484 to the frame rule's right end at 780
 
   display.setFont(&FreeSansBold9pt7b);
   printAligned(display, eyebrow, sx, topY + eyebrowOffset);
@@ -124,14 +138,18 @@ static void drawMatchupBlock(Display& display, int topY, int bottomY, const char
     display.setFont(&FreeSansBold18pt7b);
     printAligned(display, statusWord, sx, midY - 4);
     display.setFont(&FreeSansBold12pt7b);
-    printAligned(display, "vs " + oppNameFit, sx, midY + 19);
+    const std::string prefix = "vs ";
+    printAligned(display, prefix + truncateToWidth(display, oppName, nameBudget - textWidth(display, prefix)),
+                 sx, midY + 19);
     display.setFont(&FreeMonoBold18pt7b);
     printAligned(display, tally, sx, midY + 46);
     display.setFont(&FreeSans9pt7b);
     printAligned(display, caption, sx, midY + 63);
   } else {
     display.setFont(&FreeSansBold12pt7b);
-    printAligned(display, statusWord + " vs " + oppNameFit, sx, midY + 8);
+    const std::string prefix = statusWord + " vs ";
+    printAligned(display, prefix + truncateToWidth(display, oppName, nameBudget - textWidth(display, prefix)),
+                 sx, midY + 8);
     display.setFont(&FreeMonoBold12pt7b);
     printAligned(display, tally, sx, midY + 30);
   }
@@ -170,7 +188,9 @@ static void drawMatchupSidebar(Display& display, const CurrentMatchup& current, 
     printAligned(display, "NEXT WEEK", 484, lastWeekEnd + 20);
     const int midY = (lastWeekEnd + 452) / 2;
     display.setFont(&FreeSansBold12pt7b);
-    printAligned(display, "vs " + truncateToFit(next.opponent, MAX_OPPONENT_NAME_CHARS), 484, midY + 8);
+    const std::string prefix = "vs ";
+    printAligned(display, prefix + truncateToWidth(display, next.opponent, 296 - textWidth(display, prefix)),
+                 484, midY + 8);
     display.setFont(&FreeMono9pt7b);
     printAligned(display, "Their record: " + next.opponentRecord, 484, midY + 30);
   } else {
@@ -190,7 +210,7 @@ void renderStandingsPage(Display& display, const std::string& leagueName, const 
     display.fillScreen(GxEPD_WHITE);
 
     display.setFont(&FreeSansBold24pt7b);
-    printAligned(display, truncateToFit(leagueName, MAX_LEAGUE_NAME_CHARS), 20, 40);
+    printAligned(display, truncateToWidth(display, leagueName, 760), 20, 40);
     hrule(display, 20, 54, 780);
     vrule(display, 460, 64, 452);
 
@@ -228,24 +248,28 @@ void renderCategoryPage(Display& display, const std::string& myTeamName, const C
       // fetch failed server-side - a different failure than no matchup at
       // all, so it gets its own message rather than reusing the one above.
       display.setFont(&FreeSansBold18pt7b);
-      printAligned(display, "vs " + truncateToFit(current.opponent, MAX_OPPONENT_NAME_CHARS), 20, 38);
+      const std::string prefix = "vs ";
+      printAligned(display, prefix + truncateToWidth(display, current.opponent, 760 - textWidth(display, prefix)),
+                   20, 36);
       display.setFont(&FreeSansBold24pt7b);
-      printAligned(display, current.status + "  " + current.tally, 20, 70);
-      hrule(display, 20, 88, 780);
+      printAligned(display, current.status + "  " + current.tally, 20, 78);
+      hrule(display, 20, 92, 780);
       display.setFont(&FreeSansBold12pt7b);
       printAligned(display, "Category breakdown unavailable", 20, 200);
     } else {
       display.setFont(&FreeSansBold18pt7b);
-      printAligned(display, "vs " + truncateToFit(current.opponent, MAX_OPPONENT_NAME_CHARS), 20, 38);
+      const std::string prefix = "vs ";
+      printAligned(display, prefix + truncateToWidth(display, current.opponent, 760 - textWidth(display, prefix)),
+                   20, 36);
       display.setFont(&FreeSansBold24pt7b);
-      printAligned(display, current.status + "  " + current.tally, 20, 70);
-      hrule(display, 20, 88, 780);
+      printAligned(display, current.status + "  " + current.tally, 20, 78);
+      hrule(display, 20, 92, 780);
 
       const int meColX = 300, oppColX = 500, labelColX = 400;
       display.setFont(&FreeSansBold9pt7b);
-      std::string myUpper = truncateToFit(myTeamName, MAX_OPPONENT_NAME_CHARS);
+      std::string myUpper = truncateToWidth(display, myTeamName, 280);
       for (auto& c : myUpper) c = toupper(static_cast<unsigned char>(c));
-      std::string oppUpper = truncateToFit(current.opponent, MAX_OPPONENT_NAME_CHARS);
+      std::string oppUpper = truncateToWidth(display, current.opponent, 280);
       for (auto& c : oppUpper) c = toupper(static_cast<unsigned char>(c));
       printAligned(display, myUpper, meColX, 108, Align::Right);
       printAligned(display, oppUpper, oppColX, 108, Align::Left);

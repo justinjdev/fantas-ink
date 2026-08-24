@@ -4,43 +4,35 @@
 
 void test_short_name_passes_through_unchanged() {
   std::vector<StandingsRow> rows = { {false, 1, "Team A", 10, 2, 0, false} };
-  auto result = buildLayout(rows, 12);
+  auto result = buildLayout(rows);
   CHECK_EQ(result.size(), (size_t)1);
   CHECK_EQ(result[0].displayName, std::string("Team A"));
   CHECK_EQ(result[0].rank, 1);
 }
 
-void test_long_name_is_truncated_to_max_chars() {
+void test_long_name_passes_through_untruncated() {
   std::vector<StandingsRow> rows = { {false, 1, "A Very Long Team Name Indeed", 10, 2, 0, false} };
-  auto result = buildLayout(rows, 12);
-  CHECK_EQ(result[0].displayName.size(), (size_t)12);
-  CHECK_EQ(result[0].displayName, std::string("A Very Long "));
+  auto result = buildLayout(rows);
+  CHECK_EQ(result[0].displayName, std::string("A Very Long Team Name Indeed"));
 }
 
 void test_gap_row_passes_through_with_no_name_processing() {
   std::vector<StandingsRow> rows = { {true, 0, "", 0, 0, 0, false} };
-  auto result = buildLayout(rows, 12);
+  auto result = buildLayout(rows);
   CHECK_EQ(result.size(), (size_t)1);
   CHECK_EQ(result[0].isGap, true);
 }
 
 void test_isMe_flag_is_carried_through() {
   std::vector<StandingsRow> rows = { {false, 8, "My Team", 5, 7, 0, true} };
-  auto result = buildLayout(rows, 12);
+  auto result = buildLayout(rows);
   CHECK_EQ(result[0].isMe, true);
 }
 
 void test_empty_input_returns_empty_output() {
   std::vector<StandingsRow> rows;
-  auto result = buildLayout(rows, 12);
+  auto result = buildLayout(rows);
   CHECK_EQ(result.size(), (size_t)0);
-}
-
-void test_name_exactly_at_max_chars_is_not_truncated() {
-  std::vector<StandingsRow> rows = { {false, 1, "Twelve Chars", 10, 2, 0, false} };
-  auto result = buildLayout(rows, 12);
-  CHECK_EQ(result[0].displayName.size(), (size_t)12);
-  CHECK_EQ(result[0].displayName, std::string("Twelve Chars"));
 }
 
 void test_mixed_gap_and_data_rows_in_one_call() {
@@ -49,7 +41,7 @@ void test_mixed_gap_and_data_rows_in_one_call() {
     {true, 0, "", 0, 0, 0, false},
     {false, 8, "My Team", 5, 7, 0, true},
   };
-  auto result = buildLayout(rows, 12);
+  auto result = buildLayout(rows);
   CHECK_EQ(result.size(), (size_t)3);
   CHECK_EQ(result[0].isGap, false);
   CHECK_EQ(result[0].displayName, std::string("Team A"));
@@ -61,7 +53,7 @@ void test_mixed_gap_and_data_rows_in_one_call() {
 
 void test_winPct_and_streak_pass_through_unchanged() {
   std::vector<StandingsRow> rows = { {false, 1, "Team A", 10, 2, 0, false, ".833", "W4"} };
-  auto result = buildLayout(rows, 12);
+  auto result = buildLayout(rows);
   CHECK_EQ(result[0].winPct, std::string(".833"));
   CHECK_EQ(result[0].streak, std::string("W4"));
 }
@@ -89,11 +81,10 @@ void test_current_matchup_carries_a_category_list() {
 int main() {
   std::cout << "display_layout_test\n";
   RUN(test_short_name_passes_through_unchanged);
-  RUN(test_long_name_is_truncated_to_max_chars);
+  RUN(test_long_name_passes_through_untruncated);
   RUN(test_gap_row_passes_through_with_no_name_processing);
   RUN(test_isMe_flag_is_carried_through);
   RUN(test_empty_input_returns_empty_output);
-  RUN(test_name_exactly_at_max_chars_is_not_truncated);
   RUN(test_mixed_gap_and_data_rows_in_one_call);
   RUN(test_winPct_and_streak_pass_through_unchanged);
   RUN(test_matchup_structs_default_to_not_present);

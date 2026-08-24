@@ -51,9 +51,8 @@ struct NextMatchup {
   std::string opponentRecord;
 };
 
-constexpr size_t MAX_NAME_CHARS = 12;
-
-// Pure transform: truncates names to fit the display column width and
-// passes gap/isMe markers through unchanged. Does not re-derive
+// Pure transform: names pass through unmodified and gap/isMe markers pass
+// through unchanged. Fitting a name to its column is a render-time concern —
+// it depends on font metrics this module has no access to. Does not re-derive
 // windowing/dedup/gap logic — that's already done server-side.
-std::vector<LayoutRow> buildLayout(const std::vector<StandingsRow>& rows, size_t maxNameChars = MAX_NAME_CHARS);
+std::vector<LayoutRow> buildLayout(const std::vector<StandingsRow>& rows);
