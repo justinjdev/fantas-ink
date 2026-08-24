@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <cstddef>
+#include "category_layout.h"
 
 // Mirrors one entry of the server's `rows[]` (see design spec's Data
 // Contract) — already windowed/deduped/gap-marked server-side.
@@ -27,6 +28,27 @@ struct LayoutRow {
   bool isMe = false;
   std::string winPct;
   std::string streak;
+};
+
+struct MatchupSummary {
+  bool present = false;
+  std::string opponent;
+  std::string status; // "WON" | "LOST" | "TIED"
+  std::string tally;
+};
+
+struct CurrentMatchup {
+  bool present = false;
+  std::string opponent;
+  std::string status; // "AHEAD" | "BEHIND" | "TIED"
+  std::string tally;
+  std::vector<CategoryStat> categories;
+};
+
+struct NextMatchup {
+  bool present = false;
+  std::string opponent;
+  std::string opponentRecord;
 };
 
 constexpr size_t MAX_NAME_CHARS = 12;

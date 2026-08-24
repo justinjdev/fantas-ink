@@ -66,6 +66,26 @@ void test_winPct_and_streak_pass_through_unchanged() {
   CHECK_EQ(result[0].streak, std::string("W4"));
 }
 
+void test_matchup_structs_default_to_not_present() {
+  MatchupSummary last;
+  CurrentMatchup current;
+  NextMatchup next;
+  CHECK_EQ(last.present, false);
+  CHECK_EQ(current.present, false);
+  CHECK_EQ(next.present, false);
+}
+
+void test_current_matchup_carries_a_category_list() {
+  CurrentMatchup current;
+  current.present = true;
+  current.opponent = "Ice Capades";
+  current.status = "AHEAD";
+  current.tally = "7-5-1";
+  current.categories.push_back(CategoryStat{"G", 14, 10, true});
+  CHECK_EQ(current.categories.size(), (size_t)1);
+  CHECK_EQ(current.categories[0].label, std::string("G"));
+}
+
 int main() {
   std::cout << "display_layout_test\n";
   RUN(test_short_name_passes_through_unchanged);
@@ -76,6 +96,8 @@ int main() {
   RUN(test_name_exactly_at_max_chars_is_not_truncated);
   RUN(test_mixed_gap_and_data_rows_in_one_call);
   RUN(test_winPct_and_streak_pass_through_unchanged);
+  RUN(test_matchup_structs_default_to_not_present);
+  RUN(test_current_matchup_carries_a_category_list);
   if (g_failures > 0) { std::cerr << g_failures << " failure(s)\n"; return 1; }
   std::cout << "OK\n";
   return 0;
