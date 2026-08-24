@@ -1,5 +1,17 @@
 # Fantasy Hockey Scoreboard Firmware
 
+## Display preview (planned redesign, not yet implemented)
+
+Renders of the approved 800×480 layout — see
+[2026-08-23-standings-display-redesign-design.md](../docs/superpowers/specs/2026-08-23-standings-display-redesign-design.md)
+for the full spec. `renderLayout()` still produces the old single-page layout as of this commit;
+these are a preview of where it's headed, generated directly from the same drawing logic worked out
+in the design mockup, not screenshots of running firmware.
+
+| Page 1 — standings + matchup summary | Page 2 — category breakdown |
+|---|---|
+| ![Page 1: standings table with playoff line and a this-week/last-week/next-week matchup sidebar](docs/images/page1-standings.png) | ![Page 2: head-to-head category breakdown with leader markers](docs/images/page2-categories.png) |
+
 ## Toolchain
 
 ```bash
