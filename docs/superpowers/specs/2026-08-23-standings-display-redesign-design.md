@@ -276,9 +276,18 @@ cache fallback, and the "no data yet" cold-start case are all unchanged.
 - `playoffTeams` absent → the table renders with no playoff-line divider at all, not a guessed or
   omitted-but-expected line. Silence here is correct: a wrong playoff line (drawn at the wrong rank)
   would be worse than none.
-- `currentMatchup` present but `categories` omitted (settings fetch failed) → page 2 renders a plain
-  fallback ("Category breakdown unavailable") instead of an empty or garbled table. Page 1 is
-  unaffected either way, since it only uses `status`/`tally`, not `categories`.
+- Settings fetch failed, so no category definitions are available → `currentMatchup` and `lastMatchup`
+  are both `null`, and page 1 renders the same "No matchup this week"/"No result last week" fallbacks
+  as any other missing-matchup case. `nextMatchup` is unaffected, since the upcoming opponent's name
+  and record don't depend on category definitions.
+
+  `status` and `tally` are **not** independent of `categories` — they are derived from the
+  category-by-category comparison (see the server plan's Task 9 design note, which makes that
+  comparison the single source of truth rather than trusting Yahoo's `winner_team_key` as a second,
+  possibly-inconsistent one). With no categories there is no signal to derive them from, so the
+  result is unknowable rather than merely imprecise, and all three fields degrade together rather
+  than separately. Publishing a `status`/`tally` computed over zero categories would emit a
+  fabricated `TIED`/`0-0-0` that the display could not distinguish from a real tie.
 - Button-wake NVS parse failure (cache was cleared or corrupted between the last timer wake and this
   button press) → falls back to the same "No data yet" message the cold-start path already uses.
 
