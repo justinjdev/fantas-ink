@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { transformStandings } from './transform.js'
+import { transformStandings, formatWinPct } from './transform.js'
 
 function makeTeam(rank: number, teamKey: string, wins: number, losses: number, ties = 0) {
   return {
@@ -30,6 +30,28 @@ function makeRawStandings(teamCount: number) {
     },
   }
 }
+
+describe('formatWinPct', () => {
+  it('formats a fractional record without a leading zero', () => {
+    expect(formatWinPct(10, 2, 0)).toBe('.833')
+  })
+
+  it('formats an undefeated record as 1.000, not .000', () => {
+    expect(formatWinPct(12, 0, 0)).toBe('1.000')
+  })
+
+  it('formats a winless record as .000', () => {
+    expect(formatWinPct(0, 12, 0)).toBe('.000')
+  })
+
+  it('counts ties as games played', () => {
+    expect(formatWinPct(5, 5, 2)).toBe('.417')
+  })
+
+  it('returns .000 for zero games played rather than dividing by zero', () => {
+    expect(formatWinPct(0, 0, 0)).toBe('.000')
+  })
+})
 
 describe('transformStandings', () => {
   const ASOF = '2026-08-21T11:55:00Z'
@@ -89,6 +111,7 @@ describe('transformStandings', () => {
 
     const rankOne = result.rows.find((r) => 'rank' in r && r.rank === 1)
     expect(rankOne).toMatchObject({ wins: 15, losses: 0, ties: 0 })
+    expect(rankOne).toMatchObject({ winPct: '1.000' })
   })
 
   it('handles a small league where top 3 and window cover everyone (8 teams, myRank=5)', () => {

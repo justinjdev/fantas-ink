@@ -7,7 +7,7 @@ export interface StandingsPayload {
 }
 
 export type StandingsRow =
-  | { rank: number; name: string; wins: number; losses: number; ties: number; isMe?: true }
+  | { rank: number; name: string; wins: number; losses: number; ties: number; winPct: string; isMe?: true }
   | { gap: true }
 
 interface ParsedTeam {
@@ -17,6 +17,13 @@ interface ParsedTeam {
   wins: number
   losses: number
   ties: number
+}
+
+export function formatWinPct(wins: number, losses: number, ties: number): string {
+  const games = wins + losses + ties
+  const pct = games === 0 ? 0 : wins / games
+  const formatted = pct.toFixed(3)
+  return formatted.startsWith('0.') ? formatted.slice(1) : formatted
 }
 
 function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
@@ -75,6 +82,7 @@ export function transformStandings(rawYahooJson: unknown, myTeamKey: string, asO
       wins: team.wins,
       losses: team.losses,
       ties: team.ties,
+      winPct: formatWinPct(team.wins, team.losses, team.ties),
       ...(team.teamKey === myTeamKey ? { isMe: true as const } : {}),
     })
     previousRank = rank
