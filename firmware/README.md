@@ -32,7 +32,7 @@ Pinned versions this project was built and verified against:
 ## One-time setup
 
 1. `cp secrets.h.example secrets.h` and fill in your WiFi credentials, the deployed `/api/standings` URL, the shared token, and your POSIX TZ string.
-2. Set driver board DIP switch #1 to "A" (3R) for the 4.2" panel. Leave switch #2 on until firmware is stable (it gates the USB-UART bridge needed for flashing).
+2. Set driver board DIP switch #1 to "B" (0.47R) for the 7.5" panel. Leave switch #2 on until firmware is stable (it gates the USB-UART bridge needed for flashing).
 3. Confirm the board's 24-pin FFC and e-Paper Adapter are present and connect the panel — the driver board ships without a display.
 
 ## Build and flash
