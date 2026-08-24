@@ -183,19 +183,23 @@ against real `GxEPD2`/`Adafruit_GFX` font metrics on-device.
 
 **New fonts** (`Fonts/FreeSansBold{9,12,18,24}pt7b.h`, `Fonts/FreeMonoBold{9,12,18}pt7b.h` — all
 already vendored in `Adafruit_GFX_Library`, no new dependency): `FreeSansBold` for names/labels/
-headers, `FreeMonoBold` for every numeric column (rank, W-L-T, win%, streak, category values) — fixed
-pitch keeps digits aligned column-to-column without measuring text per row.
+headers, and fixed-pitch mono for every numeric column — pitch keeps digits aligned column-to-column
+without measuring text per row. Rank uses `FreeMonoBold12pt7b`; category values on the breakdown page
+use `FreeMono12pt7b`, switching to `FreeMonoBold12pt7b` only for whichever side is leading that
+category — bold marks the leader, not the column. The standings table's W-L-T, win% and streak
+columns use `FreeMono9pt7b`, dropping to 9pt so a two-digit record cannot overrun the column that
+follows, with `FreeMonoBold9pt7b` only for the highlighted `isMe` row.
 
 **New drawing primitive:** the `isMe` row highlight changes from a border rect (`drawRect`) to an
 inverted band — `fillRect` in black, then white text on top. Not used anywhere in the current
 renderer.
 
 **Page 1 — standings + matchup summary** (800×480):
-- Header: `leagueName` (truncated to a new `MAX_LEAGUE_NAME_CHARS` if needed, same truncate-to-fit
-  pattern as team names) at (20, 40), 24pt bold. Rule at y=54, full width.
+- Header: `leagueName` (measured with `getTextBounds` and truncated to the available pixel width if
+  needed, same width-based fit as team names) at (20, 40), 24pt bold. Rule at y=54, full width.
 - Vertical divider at x=460, y 64–452, separating table (left) from sidebar (right).
-- Table: top=74, row height 40, columns at x = {rank: 20, team: 56, W-L-T: 235, win%: 315,
-  streak: 385}. Gap row: a plain 1px rule at the row's vertical midpoint instead of text. `isMe` row:
+- Table: top=74, row height 40, columns at x = {rank: 20, team: 56, W-L-T: 235, win%: 335,
+  streak: 400}. Gap row: a plain 1px rule at the row's vertical midpoint instead of text. `isMe` row:
   inverted band, x 16–448.
 - **Playoff line:** when a row's rank is exactly `playoffTeams + 1` *and* it directly follows a real
   row (not a windowed gap — if the boundary itself falls inside a gap, there's nothing meaningful to
@@ -324,3 +328,7 @@ Extends the original spec's Testing Approach; the two pure-function host tests r
 - Exact column/row pixel constants — decided at the proportions/structure level against
   canvas-approximated fonts; needs a pass against real on-device `getTextBounds()` once the panel and
   vendored fonts can be tested together.
+- Category count ceiling — 13 categories is the safe maximum at the font sizes in play: `categoryRowHeight`
+  has no floor, and the 118–440 budget gives 24.77px per row at 13 against `FreeMono12pt7b`'s 24px line
+  height, but 14 categories drops it to 23.0px and rows begin to overlap. Whoever fills in the real league
+  category list should check it against this.

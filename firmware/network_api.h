@@ -25,6 +25,12 @@ struct FetchResult {
   std::vector<StandingsRow> rows;
   String rawJson;
   String asOf;
+  String leagueName;
+  bool hasPlayoffTeams = false;
+  int playoffTeams = 0;
+  CurrentMatchup currentMatchup;
+  MatchupSummary lastMatchup;
+  NextMatchup nextMatchup;
 };
 
 // Parses a standings JSON payload (as returned by /api/standings, or a

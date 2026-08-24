@@ -17,7 +17,13 @@ Display& initDisplay();
 
 // Draws the standings table. `footer` is shown at the bottom (e.g.
 // "Last updated: ..." for stale data) or left empty for fresh data.
-void renderLayout(Display& display, const std::vector<LayoutRow>& rows, const std::string& footer);
+void renderStandingsPage(Display& display, const std::string& leagueName, const std::vector<LayoutRow>& rows,
+                          bool hasPlayoffTeams, int playoffTeams, const CurrentMatchup& current,
+                          const MatchupSummary& last, const NextMatchup& next, const std::string& footer);
+
+// Draws the head-to-head category breakdown table for the current matchup.
+void renderCategoryPage(Display& display, const std::string& myTeamName, const CurrentMatchup& current,
+                         const std::string& footer);
 
 // Full-screen single message — used for the first-boot/empty-cache case.
 void renderMessage(Display& display, const std::string& message);

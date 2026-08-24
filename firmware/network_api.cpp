@@ -48,6 +48,43 @@ void syncTime(const char* tzString) {
   }
 }
 
+static CurrentMatchup parseCurrentMatchup(JsonVariant node) {
+  CurrentMatchup m;
+  if (node.isNull()) return m;
+  m.present = true;
+  m.opponent = node["opponent"].as<std::string>();
+  m.status = node["status"].as<std::string>();
+  m.tally = node["tally"].as<std::string>();
+  for (JsonObject catObj : node["categories"].as<JsonArray>()) {
+    CategoryStat stat;
+    stat.label = catObj["label"].as<std::string>();
+    stat.mine = catObj["mine"].as<double>();
+    stat.theirs = catObj["theirs"].as<double>();
+    stat.higherWins = catObj["higherWins"] | true;
+    m.categories.push_back(stat);
+  }
+  return m;
+}
+
+static MatchupSummary parseMatchupSummary(JsonVariant node) {
+  MatchupSummary m;
+  if (node.isNull()) return m;
+  m.present = true;
+  m.opponent = node["opponent"].as<std::string>();
+  m.status = node["status"].as<std::string>();
+  m.tally = node["tally"].as<std::string>();
+  return m;
+}
+
+static NextMatchup parseNextMatchup(JsonVariant node) {
+  NextMatchup m;
+  if (node.isNull()) return m;
+  m.present = true;
+  m.opponent = node["opponent"].as<std::string>();
+  m.opponentRecord = node["opponentRecord"].as<std::string>();
+  return m;
+}
+
 FetchResult parseStandingsJson(const String& payload) {
   FetchResult result;
   JsonDocument doc;
@@ -65,6 +102,8 @@ FetchResult parseStandingsJson(const String& payload) {
       row.losses = rowObj["losses"].as<int>();
       row.ties = rowObj["ties"].as<int>();
       row.isMe = rowObj["isMe"].is<bool>() && rowObj["isMe"].as<bool>();
+      row.winPct = rowObj["winPct"].as<std::string>();
+      row.streak = rowObj["streak"].as<std::string>();
     }
     result.rows.push_back(row);
   }
@@ -72,6 +111,13 @@ FetchResult parseStandingsJson(const String& payload) {
 
   result.asOf = doc["asOf"].as<String>();
   if (result.asOf.length() == 0) return FetchResult{};
+
+  result.leagueName = doc["leagueName"].as<String>();
+  result.hasPlayoffTeams = !doc["playoffTeams"].isNull();
+  if (result.hasPlayoffTeams) result.playoffTeams = doc["playoffTeams"].as<int>();
+  result.currentMatchup = parseCurrentMatchup(doc["currentMatchup"]);
+  result.lastMatchup = parseMatchupSummary(doc["lastMatchup"]);
+  result.nextMatchup = parseNextMatchup(doc["nextMatchup"]);
 
   result.rawJson = payload;
   result.success = true;
