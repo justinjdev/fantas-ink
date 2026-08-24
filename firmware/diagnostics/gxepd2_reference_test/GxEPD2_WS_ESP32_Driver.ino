@@ -9,7 +9,7 @@
 #include <GxEPD2_BW.h>
 #include <Fonts/FreeMonoBold9pt7b.h>
 
-#define GxEPD2_DRIVER_CLASS GxEPD2_420_GDEY042T81 // GDEY042T81 400x300, SSD1683 (no inking)
+#define GxEPD2_DRIVER_CLASS GxEPD2_750_GDEY075T7 // GDEY075T7 800x480, UC8179
 
 #define GxEPD2_BW_IS_GxEPD2_BW true
 #define IS_GxEPD(c, x) (c##x)

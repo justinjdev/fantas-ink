@@ -5,12 +5,12 @@
 #include <string>
 #include "display_layout.h"
 
-using Display = GxEPD2_BW<GxEPD2_420_GDEY042T81, GxEPD2_420_GDEY042T81::HEIGHT>;
+using Display = GxEPD2_BW<GxEPD2_750_GDEY075T7, GxEPD2_750_GDEY075T7::HEIGHT>;
 
 // Constructs the remapped HSPI bus this board requires (its CLK/DIN pins
 // are swapped from the ESP32's default VSPI — see design spec's Hardware
 // section) and returns a reference to the initialized display object.
-// The object is file-scope static in display_render.cpp: its ~15KB
+// The object is file-scope static in display_render.cpp: its ~48KB
 // framebuffer does not fit on loopTask's 8192-byte stack, so callers must
 // bind the result to a `Display&`, never to a by-value `Display`.
 Display& initDisplay();

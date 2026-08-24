@@ -2,7 +2,7 @@
 
 ## Overview
 
-A Waveshare 4.2" e-paper display (400x300), driven by the Waveshare ESP32
+A Waveshare 7.5" e-paper display (800x480), driven by the Waveshare ESP32
 e-Paper Driver Board (a standalone board with the ESP32 onboard, not the
 Raspberry Pi/Jetson HAT of a similar name), wakes once a day at ~8am to show the current Yahoo
 Fantasy Hockey league standings: top 3 teams plus a window around the user's own
@@ -20,10 +20,20 @@ regardless (see Hardware section) — deep sleep naturally satisfies both.
 ## Hardware
 
 - **MCU:** ESP32 (Waveshare ESP32 e-Paper Driver Board)
-- **Display:** Waveshare 4.2" e-Paper, 400x300, raw SPI panel. In hand: rev
-  2.2 (V2). Confirm on unboxing that the driver board's 24-pin FFC and
-  e-Paper Adapter are present — the driver board ships without a display, so
-  these don't come from the panel's own packaging.
+- **Display:** Waveshare 7.5" e-Paper, 800x480, raw panel (no onboard PCB),
+  "GDEY075T7" generation (UC8179 controller, fast-refresh). Connects via its
+  24-pin/0.5mm FFC ribbon into the driver board's **e-Paper Adapter**
+  (FFC-to-FFC) and `J1` — confirm on unboxing that the driver board's 24-pin
+  FFC extension cable and e-Paper Adapter are present, since the driver board
+  ships without a display and these don't come from the panel's own
+  packaging.
+
+  **History:** the first panel tried was a 4.2" e-Paper *Module* (400x300,
+  SSD1683, its own onboard driver PCB, connected via an 8-pin pigtail
+  directly into `J3`/`J4` instead of the FFC/adapter path this section
+  originally assumed) — it turned out to be dead on arrival; see
+  `firmware/HARDWARE_BRINGUP_STATUS.md` for the full debugging log. The 7.5"
+  raw panel actually matches this section's original FFC/adapter assumption.
 - **Display library:** GxEPD2 (Adafruit_GFX rendering) — actively maintained
   (v1.6.9). **Pin to >= 1.6.0**, not just "latest at time of writing": two
   bugs specific to this exact panel revision were fixed in that range —
@@ -33,26 +43,28 @@ regardless (see Hardware section) — deep sleep naturally satisfies both.
   design does a full refresh every wake, so a pre-1.6.0 library against this
   panel gives a broken refresh with no compile error — a silent-corruption
   trap, not a crash.
-- **Panel driver class:** `GxEPD2_420_GDEY042T81` — confirmed against the
-  GxEPD2 source (`src/gdey/GxEPD2_420_GDEY042T81.h`, not `src/epd/` where the
-  older `GxEPD2_420` class for rev 2.1/V1 panels lives; worth calling out
-  since it trips up manual includes). Declares `WIDTH=400`, `HEIGHT=300`,
-  monochrome, SSD1683 controller — matches this panel. Two behaviors worth
-  carrying into the plan:
+- **Panel driver class:** `GxEPD2_750_GDEY075T7` — confirmed against the
+  GxEPD2 source (`src/gdey/GxEPD2_750_GDEY075T7.h`, not `src/epd/` where the
+  older `GxEPD2_750_T7` class for the legacy/V1 GDEW075T7 panel lives; worth
+  calling out since it trips up manual includes — same naming split as the
+  old 4.2" panel had). Declares `WIDTH=800`, `HEIGHT=480`, monochrome, UC8179
+  controller — matches this panel. Two behaviors worth carrying into the
+  plan:
   - `useFastFullUpdate` degrades below 0°C (the panel's spec floor) — fine
     for an indoor scoreboard, but set `false` if this ever runs somewhere
     unheated.
-  - `hibernate()` only issues the SSD1683 sleep command when `_rst >= 0` —
-    since RST is wired to GPIO26 (not omitted), this works as expected, but
-    it means a real RST pin is a hard requirement for hibernate to do
-    anything at all, not just good practice.
+  - `hibernate()` only issues the sleep command when `_rst >= 0` — since RST
+    is wired to GPIO26 (not omitted), this works as expected, but it means a
+    real RST pin is a hard requirement for hibernate to do anything at all,
+    not just good practice.
   - Header-declared timing: `full_refresh_time = 1200ms`,
-    `power_on_time = 100ms` — useful for sizing the wake-cycle time budget
+    `power_on_time = 140ms` — useful for sizing the wake-cycle time budget
     below (Waveshare's generic product page quotes ~5s, which overstates it
     for this panel).
 - **DIP switches** (on the driver board): switch #1 sets the booster
-  current-limit resistor per panel model — must be set to **"A" (3R)** for
-  this 4.2" panel; wrong position gives poor/absent output that looks
+  current-limit resistor per panel model — must be set to **"B" (0.47R)**
+  for this 7.5" panel (the old 4.2" panel needed "A" (3R) — these are not
+  interchangeable); wrong position gives poor/absent output that looks
   identical to a wiring or driver-class bug. Switch #2 gates power to the
   onboard USB-UART bridge (off saves a little power, but you can't reflash
   with it off — leave it on until firmware is stable).
@@ -165,6 +177,11 @@ day to day, and needs real margin against the cron write it depends on.
 
 ## Data Contract
 
+**Superseded 2026-08-23** — see
+[2026-08-23-standings-display-redesign-design.md](./2026-08-23-standings-display-redesign-design.md)
+for the current shape of `latest.json` (adds `leagueName`, `winPct`, `streak`, `currentMatchup`,
+`lastMatchup`). The version below is what shipped originally; kept for history, not current truth.
+
 `latest.json`, written by the cron job, read by the ESP32:
 
 ```json
@@ -213,7 +230,7 @@ day to day, and needs real margin against the cron write it depends on.
 firmware/
   fantasy_hockey_scoreboard.ino   # setup/loop: wake reason, orchestration, deep sleep
   network_api.h/.cpp              # WiFi connect, NTP sync, HTTPS GET + retry, JSON parse
-  display_layout.h/.cpp           # renders the rows[] view model to the 400x300 canvas
+  display_layout.h/.cpp           # renders the rows[] view model to the panel's canvas
   secrets.h.example                # WIFI_SSID, WIFI_PASSWORD, STANDINGS_URL, SHARED_TOKEN
   secrets.h                        # gitignored, real values
 
@@ -227,7 +244,7 @@ server/
 
 `display_layout` knows nothing about Yahoo or HTTP; `network_api` knows nothing
 about rendering — same separation the original hardware notes called for, re-scoped
-to the 4.2" panel and the new data contract.
+to the current panel and the new data contract.
 
 ## One-Time Manual Setup
 
@@ -264,8 +281,24 @@ Not automatable — requires the user's browser, hands-on-hardware, or both:
 
 - Live NHL game scores / in-game refresh cadence — this project is standings-only,
   once a day.
-- Button-based paging through multiple standings views — the data only changes
-  once a day, so paging cached views doesn't add freshness, only firmware
-  complexity (extra GPIO wake source, page state persisted across deep sleep).
+- ~~Button-based paging through multiple standings views~~ — reversed 2026-08-23, see
+  [2026-08-23-standings-display-redesign-design.md](./2026-08-23-standings-display-redesign-design.md).
+  The reasoning below still held for paging *the same* once-daily view; it stopped applying once a
+  genuinely distinct second page (full category breakdown) needed its own screen. The complexity
+  flagged here (extra GPIO wake source, page state persisted across deep sleep) is real and is
+  designed for in that doc, not avoided.
 - Multi-league support, historical trends, or matchup details — single league,
   current standings only.
+
+## Future Considerations
+
+- **Multiple panel sizes/models and layouts:** the panel driver class, canvas
+  dimensions, and row/column pixel coordinates are all hardcoded to one
+  physical panel today (`display_render.h`'s `Display` typedef, and
+  `display_render.cpp`'s `COL_RECORD_X`/`ROW_HEIGHT`/etc). This has already
+  needed a manual swap once, from a dead 4.2" (400x300) panel to a 7.5"
+  (800x480) replacement — see `firmware/HARDWARE_BRINGUP_STATUS.md`. Worth
+  revisiting if this ever needs to support more than one physical panel
+  (e.g. building for multiple recipients with different hardware) — would
+  mean parameterizing the driver class and layout instead of hardcoding one
+  of each. Not needed for the current single-panel project.
