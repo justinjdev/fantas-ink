@@ -2,9 +2,12 @@
 import { put, head, BlobNotFoundError } from '@vercel/blob'
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto'
 import type { StandingsPayload } from './transform.js'
+import type { LeagueSettings } from './leagueSettings.js'
+import type { CurrentMatchup, MatchupSummary } from './matchup.js'
 
 const REFRESH_TOKEN_PATH = 'private/yahoo-refresh-token.json'
 const STANDINGS_PATH = 'latest.json'
+const LEAGUE_SETTINGS_PATH = 'league-settings.json'
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 12
 const AUTH_TAG_LENGTH = 16
@@ -72,12 +75,38 @@ export async function setStoredRefreshToken(token: string): Promise<void> {
   })
 }
 
-export async function getLatestStandings(): Promise<StandingsPayload | null> {
-  return readJsonBlob<StandingsPayload>(STANDINGS_PATH)
+export interface NextMatchupInfo {
+  opponent: string
+  opponentRecord: string
 }
 
-export async function setLatestStandings(payload: StandingsPayload): Promise<void> {
+export interface LatestStandingsPayload extends StandingsPayload {
+  playoffTeams: number | null
+  currentMatchup: CurrentMatchup | null
+  lastMatchup: MatchupSummary | null
+  nextMatchup: NextMatchupInfo | null
+}
+
+export async function getLatestStandings(): Promise<LatestStandingsPayload | null> {
+  return readJsonBlob<LatestStandingsPayload>(STANDINGS_PATH)
+}
+
+export async function setLatestStandings(payload: LatestStandingsPayload): Promise<void> {
   await put(STANDINGS_PATH, JSON.stringify(payload), {
+    access: 'public',
+    contentType: 'application/json',
+    cacheControlMaxAge: MIN_CACHE_CONTROL_MAX_AGE,
+    addRandomSuffix: false,
+    allowOverwrite: true,
+  })
+}
+
+export async function getCachedLeagueSettings(): Promise<LeagueSettings | null> {
+  return readJsonBlob<LeagueSettings>(LEAGUE_SETTINGS_PATH)
+}
+
+export async function setCachedLeagueSettings(settings: LeagueSettings): Promise<void> {
+  await put(LEAGUE_SETTINGS_PATH, JSON.stringify(settings), {
     access: 'public',
     contentType: 'application/json',
     cacheControlMaxAge: MIN_CACHE_CONTROL_MAX_AGE,

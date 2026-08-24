@@ -1,0 +1,34 @@
+// firmware/display_render.h
+#pragma once
+#include <GxEPD2_BW.h>
+#include <vector>
+#include <string>
+#include "display_layout.h"
+
+using Display = GxEPD2_BW<GxEPD2_750_GDEY075T7, GxEPD2_750_GDEY075T7::HEIGHT>;
+
+// Constructs the remapped HSPI bus this board requires (its CLK/DIN pins
+// are swapped from the ESP32's default VSPI — see design spec's Hardware
+// section) and returns a reference to the initialized display object.
+// The object is file-scope static in display_render.cpp: its ~48KB
+// framebuffer does not fit on loopTask's 8192-byte stack, so callers must
+// bind the result to a `Display&`, never to a by-value `Display`.
+Display& initDisplay();
+
+// Draws the standings table. `footer` is shown at the bottom (e.g.
+// "Last updated: ..." for stale data) or left empty for fresh data.
+void renderStandingsPage(Display& display, const std::string& leagueName, const std::vector<LayoutRow>& rows,
+                          bool hasPlayoffTeams, int playoffTeams, const CurrentMatchup& current,
+                          const MatchupSummary& last, const NextMatchup& next, const std::string& footer);
+
+// Draws the head-to-head category breakdown table for the current matchup.
+void renderCategoryPage(Display& display, const std::string& myTeamName, const CurrentMatchup& current,
+                         const std::string& footer);
+
+// Full-screen single message — used for the first-boot/empty-cache case.
+void renderMessage(Display& display, const std::string& message);
+
+// Must be called after every render. See design spec: an unrefreshed,
+// still-powered panel can be permanently damaged per Waveshare's own
+// documentation — this is not optional cleanup.
+void hibernateDisplay(Display& display);
