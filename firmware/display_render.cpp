@@ -62,6 +62,7 @@ Display& initDisplay() {
 }
 
 constexpr size_t MAX_LEAGUE_NAME_CHARS = 24;
+constexpr size_t MAX_OPPONENT_NAME_CHARS = 14; // provisional - confirm against real hardware
 
 static std::string truncateToFit(const std::string& text, size_t maxChars) {
   return text.size() > maxChars ? text.substr(0, maxChars) : text;
@@ -114,6 +115,7 @@ static void drawMatchupBlock(Display& display, int topY, int bottomY, const char
   const int sx = 484;
   const int midY = (topY + bottomY) / 2;
   const int eyebrowOffset = 20;
+  const std::string oppNameFit = truncateToFit(oppName, MAX_OPPONENT_NAME_CHARS);
 
   display.setFont(&FreeSansBold9pt7b);
   printAligned(display, eyebrow, sx, topY + eyebrowOffset);
@@ -122,14 +124,14 @@ static void drawMatchupBlock(Display& display, int topY, int bottomY, const char
     display.setFont(&FreeSansBold18pt7b);
     printAligned(display, statusWord, sx, midY - 4);
     display.setFont(&FreeSansBold12pt7b);
-    printAligned(display, "vs " + oppName, sx, midY + 19);
+    printAligned(display, "vs " + oppNameFit, sx, midY + 19);
     display.setFont(&FreeMonoBold18pt7b);
     printAligned(display, tally, sx, midY + 46);
     display.setFont(&FreeSans9pt7b);
     printAligned(display, caption, sx, midY + 63);
   } else {
     display.setFont(&FreeSansBold12pt7b);
-    printAligned(display, statusWord + " vs " + oppName, sx, midY + 8);
+    printAligned(display, statusWord + " vs " + oppNameFit, sx, midY + 8);
     display.setFont(&FreeMonoBold12pt7b);
     printAligned(display, tally, sx, midY + 30);
   }
@@ -168,7 +170,7 @@ static void drawMatchupSidebar(Display& display, const CurrentMatchup& current, 
     printAligned(display, "NEXT WEEK", 484, lastWeekEnd + 20);
     const int midY = (lastWeekEnd + 452) / 2;
     display.setFont(&FreeSansBold12pt7b);
-    printAligned(display, "vs " + next.opponent, 484, midY + 8);
+    printAligned(display, "vs " + truncateToFit(next.opponent, MAX_OPPONENT_NAME_CHARS), 484, midY + 8);
     display.setFont(&FreeMono9pt7b);
     printAligned(display, "Their record: " + next.opponentRecord, 484, midY + 30);
   } else {
@@ -226,7 +228,7 @@ void renderCategoryPage(Display& display, const std::string& myTeamName, const C
       // fetch failed server-side - a different failure than no matchup at
       // all, so it gets its own message rather than reusing the one above.
       display.setFont(&FreeSansBold18pt7b);
-      printAligned(display, "vs " + current.opponent, 20, 38);
+      printAligned(display, "vs " + truncateToFit(current.opponent, MAX_OPPONENT_NAME_CHARS), 20, 38);
       display.setFont(&FreeSansBold24pt7b);
       printAligned(display, current.status + "  " + current.tally, 20, 70);
       hrule(display, 20, 88, 780);
@@ -234,16 +236,16 @@ void renderCategoryPage(Display& display, const std::string& myTeamName, const C
       printAligned(display, "Category breakdown unavailable", 20, 200);
     } else {
       display.setFont(&FreeSansBold18pt7b);
-      printAligned(display, "vs " + current.opponent, 20, 38);
+      printAligned(display, "vs " + truncateToFit(current.opponent, MAX_OPPONENT_NAME_CHARS), 20, 38);
       display.setFont(&FreeSansBold24pt7b);
       printAligned(display, current.status + "  " + current.tally, 20, 70);
       hrule(display, 20, 88, 780);
 
       const int meColX = 300, oppColX = 500, labelColX = 400;
       display.setFont(&FreeSansBold9pt7b);
-      std::string myUpper = myTeamName;
+      std::string myUpper = truncateToFit(myTeamName, MAX_OPPONENT_NAME_CHARS);
       for (auto& c : myUpper) c = toupper(static_cast<unsigned char>(c));
-      std::string oppUpper = current.opponent;
+      std::string oppUpper = truncateToFit(current.opponent, MAX_OPPONENT_NAME_CHARS);
       for (auto& c : oppUpper) c = toupper(static_cast<unsigned char>(c));
       printAligned(display, myUpper, meColX, 108, Align::Right);
       printAligned(display, oppUpper, oppColX, 108, Align::Left);
