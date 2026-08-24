@@ -108,6 +108,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       console.error('matchup fetch failed, proceeding without current/last/next matchup', err)
     }
 
+    // status/tally are derived FROM the category comparison (see matchup.ts),
+    // not an independent signal - with no categories there is nothing to
+    // derive them from, so a status/tally computed over zero categories
+    // would be a fabricated TIED/0-0-0, indistinguishable from a real tie.
+    // nextMatchup is unaffected: it doesn't depend on category definitions.
+    if (settings.categories.length === 0) {
+      currentMatchup = null
+      lastMatchup = null
+    }
+
     const payload: LatestStandingsPayload = {
       ...standings,
       playoffTeams: settings.playoffTeams,

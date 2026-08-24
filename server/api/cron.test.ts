@@ -2,6 +2,44 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
+// matchup.ts is NOT mocked in this file - the real parseMatchups runs
+// against whatever fetchMyMatchupsMock resolves to, same fixture shape as
+// matchup.test.ts, so this can exercise the real degrade-together behavior
+// rather than a mocked stand-in for it.
+function makeMatchupTeam(teamKey: string, name: string, statValues: Record<string, string>) {
+  return {
+    team: [
+      [{ team_key: teamKey }, { name }],
+      { team_stats: { stats: Object.entries(statValues).map(([stat_id, value]) => ({ stat: { stat_id, value } })) } },
+    ],
+  }
+}
+
+function makeMatchup(week: number, status: string, myStats: Record<string, string>, theirStats: Record<string, string>) {
+  return {
+    matchup: {
+      week: String(week),
+      status,
+      teams: {
+        '0': { team: makeMatchupTeam('453.l.1.t.7', 'Cellar Dwellers', myStats).team },
+        '1': { team: makeMatchupTeam('453.l.1.t.2', 'Puck Norris', theirStats).team },
+        count: 2,
+      },
+    },
+  }
+}
+
+function makeRawMatchups(matchups: Record<string, unknown>) {
+  return {
+    fantasy_content: {
+      team: [
+        [{ team_key: '453.l.1.t.7' }, { name: 'Cellar Dwellers' }],
+        { matchups: { ...matchups, count: Object.keys(matchups).length } },
+      ],
+    },
+  }
+}
+
 const getStoredRefreshTokenMock = vi.fn()
 const setStoredRefreshTokenMock = vi.fn()
 const setLatestStandingsMock = vi.fn()
@@ -219,5 +257,35 @@ describe('GET /api/cron', () => {
     const written = setLatestStandingsMock.mock.calls[0][0]
     expect(written.playoffTeams).toBeNull()
     expect(written.rows).toHaveLength(1)
+  })
+
+  it('nulls out currentMatchup and lastMatchup when categories are unavailable, even though the matchup fetch itself succeeded', async () => {
+    getStoredRefreshTokenMock.mockResolvedValue('stored-refresh-token')
+    refreshAccessTokenMock.mockResolvedValue({ accessToken: 'access-1', refreshToken: 'rotated-refresh', expiresIn: 3600 })
+    fetchLeagueStandingsMock.mockResolvedValue({ raw: true })
+    transformStandingsMock.mockReturnValue({
+      asOf: 'x',
+      myTeamKey: '453.l.1.t.7',
+      leagueName: 'Test League',
+      rows: [{ rank: 1, name: 'Cellar Dwellers', wins: 5, losses: 2, ties: 0, winPct: '.714', streak: 'W2', isMe: true }],
+    })
+    // Settings degrade to empty categories (cache miss + fetch failure), but
+    // the matchup fetch succeeds with a real in-progress matchup - this is
+    // exactly the state that used to fabricate TIED/0-0-0.
+    getCachedLeagueSettingsMock.mockResolvedValue(null)
+    fetchLeagueSettingsMock.mockRejectedValue(new Error('Yahoo league settings request failed: 500'))
+    fetchMyMatchupsMock.mockResolvedValue(
+      makeRawMatchups({ '0': makeMatchup(20, 'midevent', { '1': '14' }, { '1': '10' }) })
+    )
+
+    const req = { headers: { authorization: 'Bearer cron-secret' } } as unknown as VercelRequest
+    const res = mockRes()
+
+    await handler(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    const written = setLatestStandingsMock.mock.calls[0][0]
+    expect(written.currentMatchup).toBeNull()
+    expect(written.lastMatchup).toBeNull()
   })
 })
