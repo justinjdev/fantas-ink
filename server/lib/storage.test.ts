@@ -1,6 +1,7 @@
 // server/lib/storage.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { LeagueSettings } from './leagueSettings.js'
+import type { LatestStandingsPayload } from './storage.js'
 
 const putMock = vi.fn()
 const headMock = vi.fn()
@@ -87,10 +88,15 @@ describe('standings storage', () => {
     headMock.mockReset()
   })
 
-  const payload = {
+  const payload: LatestStandingsPayload = {
     asOf: '2026-08-21T11:55:00Z',
     myTeamKey: '453.l.1.t.7',
-    rows: [{ rank: 1, name: 'Team A', wins: 10, losses: 2, ties: 0 }],
+    leagueName: 'Test League',
+    rows: [{ rank: 1, name: 'Team A', wins: 10, losses: 2, ties: 0, winPct: '.833', streak: 'W3' }],
+    playoffTeams: 6,
+    currentMatchup: null,
+    lastMatchup: null,
+    nextMatchup: null,
   }
 
   it('setLatestStandings writes latest.json publicly', async () => {
@@ -115,6 +121,46 @@ describe('standings storage', () => {
     const result = await getLatestStandings()
 
     expect(result).toBeNull()
+  })
+})
+
+describe('latest standings payload — matchup and playoff fields', () => {
+  beforeEach(() => {
+    putMock.mockReset()
+    headMock.mockReset()
+  })
+
+  it('round-trips playoffTeams and all three matchup fields, including nulls', async () => {
+    const payload: LatestStandingsPayload = {
+      asOf: '2026-08-23T11:55:00Z',
+      myTeamKey: '453.l.1.t.8',
+      leagueName: 'Test League',
+      rows: [],
+      playoffTeams: 6,
+      currentMatchup: {
+        opponent: 'Ice Capades',
+        status: 'AHEAD',
+        tally: '7-5-1',
+        categories: [{ label: 'G', mine: 14, theirs: 10, higherWins: true }],
+      },
+      lastMatchup: { opponent: 'Puck Norris', status: 'LOST', tally: '3-5-1' },
+      nextMatchup: null,
+    }
+
+    let storedBody = ''
+    putMock.mockImplementation((_pathname: string, body: string) => {
+      storedBody = body
+    })
+    headMock.mockResolvedValue({ url: 'https://blob.example/latest.json' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => ({ ok: true, json: async () => JSON.parse(storedBody) }))
+    )
+
+    await setLatestStandings(payload)
+    const result = await getLatestStandings()
+
+    expect(result).toEqual(payload)
   })
 })
 
