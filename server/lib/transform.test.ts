@@ -141,4 +141,11 @@ describe('transformStandings', () => {
     const ranks = result.rows.map((r) => ('gap' in r ? 'gap' : r.rank))
     expect(ranks).toEqual([1, 2, 3, 4, 5, 6, 7])
   })
+
+  it('reads the league name from the top of the raw response, not a team name', () => {
+    const raw = makeRawStandings(16)
+    const result = transformStandings(raw, '453.l.1.t.8', ASOF)
+
+    expect(result.leagueName).toBe('Test League')
+  })
 })

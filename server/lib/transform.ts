@@ -3,6 +3,7 @@ import { findByKey, numberedEntries } from './yahooJson.js'
 export interface StandingsPayload {
   asOf: string
   myTeamKey: string
+  leagueName: string
   rows: StandingsRow[]
 }
 
@@ -61,6 +62,7 @@ function parseAllTeams(rawYahooJson: unknown): ParsedTeam[] {
 }
 
 export function transformStandings(rawYahooJson: unknown, myTeamKey: string, asOf: string): StandingsPayload {
+  const leagueName = findByKey(rawYahooJson, 'name') as string
   const teams = parseAllTeams(rawYahooJson)
   const myTeam = teams.find((t) => t.teamKey === myTeamKey)
   if (!myTeam) {
@@ -97,5 +99,5 @@ export function transformStandings(rawYahooJson: unknown, myTeamKey: string, asO
     previousRank = rank
   }
 
-  return { asOf, myTeamKey, rows }
+  return { asOf, myTeamKey, leagueName, rows }
 }
