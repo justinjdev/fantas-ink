@@ -74,7 +74,8 @@ void setup() {
   if (haveFreshData) {
     Serial.printf("Data source: fresh fetch (%u rows)\n", (unsigned)data.rows.size());
     auto layout = buildLayout(data.rows);
-    renderLayout(display, layout, "");
+    renderStandingsPage(display, data.leagueName.c_str(), layout, data.hasPlayoffTeams, data.playoffTeams,
+                        data.currentMatchup, data.lastMatchup, data.nextMatchup, "");
   } else {
     FetchResult cached;
     if (hasCachedStandings()) {
@@ -84,7 +85,8 @@ void setup() {
       Serial.printf("Data source: NVS cache (%u rows)\n", (unsigned)cached.rows.size());
       auto layout = buildLayout(cached.rows);
       std::string footer = "Last updated: " + std::string(cached.asOf.c_str());
-      renderLayout(display, layout, footer);
+      renderStandingsPage(display, cached.leagueName.c_str(), layout, cached.hasPlayoffTeams, cached.playoffTeams,
+                          cached.currentMatchup, cached.lastMatchup, cached.nextMatchup, footer);
     } else {
       // Covers both "never fetched anything" and "cache present but empty or
       // corrupt" — rendering the latter would leave a blank page with a bare
