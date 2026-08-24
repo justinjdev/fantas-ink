@@ -1,12 +1,13 @@
 # Fantasy Hockey Scoreboard Firmware
 
-## Display preview (planned redesign, not yet implemented)
+## Display preview
 
-Renders of the approved 800×480 layout — see
+Renders of the 800×480 layout — see
 [2026-08-23-standings-display-redesign-design.md](../docs/superpowers/specs/2026-08-23-standings-display-redesign-design.md)
 for the full spec. Page 1 is rendered by `renderStandingsPage()` (standings table and matchup sidebar);
 page 2 is rendered by `renderCategoryPage()` (head-to-head category breakdown). These are generated
-directly from the same drawing logic worked out in the design mockup, not screenshots of running firmware.
+directly from the same drawing logic worked out in the design mockup, not screenshots of running firmware,
+but the layout is confirmed working on physical hardware.
 
 | Page 1 — standings + matchup summary | Page 2 — category breakdown |
 |---|---|
