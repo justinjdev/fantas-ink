@@ -84,26 +84,27 @@ static std::string truncateToWidth(Display& display, const std::string& text, in
 
 static void drawStandingsTable(Display& display, const std::vector<LayoutRow>& rows,
                                 bool hasPlayoffTeams, int playoffTeams) {
-  const int top = 74, rowH = 40;
+  const float tableTop = 74.0f, tableBottom = 452.0f;
   const int rankX = 20, teamX = 56, wltX = 235, pctX = 335, strkX = 400;
 
-  int y = top;
+  const float rowH = standingsRowHeight(rows.size(), tableTop, tableBottom);
+  float y = tableTop;
   bool prevWasGap = false;
   for (const auto& row : rows) {
     if (row.isGap) {
-      hrule(display, teamX, y + rowH / 2, 440);
+      hrule(display, teamX, static_cast<int>(y + rowH / 2), 440);
       y += rowH;
       prevWasGap = true;
       continue;
     }
     if (hasPlayoffTeams && row.rank == playoffTeams + 1 && !prevWasGap) {
-      for (int x = 56; x < 440; x += 10) display.fillRect(x, y, 6, 2, GxEPD_BLACK);
+      for (int x = 56; x < 440; x += 10) display.fillRect(x, static_cast<int>(y), 6, 2, GxEPD_BLACK);
     }
     prevWasGap = false;
 
-    const int baseline = y + rowH / 2 + 7;
+    const int baseline = static_cast<int>(y + rowH / 2.0f) + 7;
     if (row.isMe) {
-      display.fillRect(16, y + 2, 432, rowH - 6, GxEPD_BLACK);
+      display.fillRect(16, static_cast<int>(y) + 2, 432, static_cast<int>(rowH) - 6, GxEPD_BLACK);
       display.setTextColor(GxEPD_WHITE);
     } else {
       display.setTextColor(GxEPD_BLACK);
@@ -212,7 +213,7 @@ void renderStandingsPage(Display& display, const std::string& leagueName, const 
     display.setFont(&FreeSansBold24pt7b);
     printAligned(display, truncateToWidth(display, leagueName, 760), 20, 40);
     hrule(display, 20, 54, 780);
-    vrule(display, 460, 64, 452);
+    vrule(display, 460, 54, 452);
 
     drawStandingsTable(display, rows, hasPlayoffTeams, playoffTeams);
     drawMatchupSidebar(display, current, last, next);

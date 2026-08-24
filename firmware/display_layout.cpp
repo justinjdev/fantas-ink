@@ -22,3 +22,8 @@ std::vector<LayoutRow> buildLayout(const std::vector<StandingsRow>& rows) {
   }
   return result;
 }
+
+float standingsRowHeight(size_t rowCount, float tableTop, float tableBottom) {
+  if (rowCount == 0) return 0.0f;
+  return (tableBottom - tableTop) / static_cast<float>(rowCount);
+}

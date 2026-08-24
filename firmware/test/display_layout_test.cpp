@@ -78,6 +78,29 @@ void test_current_matchup_carries_a_category_list() {
   CHECK_EQ(current.categories[0].label, std::string("G"));
 }
 
+void test_standings_row_height_evenly_divides_the_available_space() {
+  // 10 teams + 1 gap divider, the exact shape that overran the panel with a
+  // hardcoded 40px row height (see display_render.cpp's drawStandingsTable).
+  float height = standingsRowHeight(11, 74.0f, 452.0f);
+  CHECK_EQ(74.0f + height * 11 <= 452.0f, true);
+}
+
+void test_standings_row_height_adapts_to_row_count_without_overrunning() {
+  float heightFor11 = standingsRowHeight(11, 74.0f, 452.0f);
+  float heightFor6 = standingsRowHeight(6, 74.0f, 452.0f);
+  // Fewer rows must mean MORE room per row, not the same hardcoded value —
+  // this is the exact property that let a hardcoded height run past the
+  // footer once the roster plus a playoff-gap row exceeded what a fixed
+  // 40px row height could fit above y=452.
+  CHECK_EQ(heightFor6 > heightFor11, true);
+  CHECK_EQ(74.0f + heightFor6 * 6 <= 452.0f, true);
+  CHECK_EQ(74.0f + heightFor11 * 11 <= 452.0f, true);
+}
+
+void test_standings_row_height_is_zero_for_zero_rows_not_a_divide_by_zero_crash() {
+  CHECK_EQ(standingsRowHeight(0, 74.0f, 452.0f), 0.0f);
+}
+
 int main() {
   std::cout << "display_layout_test\n";
   RUN(test_short_name_passes_through_unchanged);
@@ -89,6 +112,9 @@ int main() {
   RUN(test_winPct_and_streak_pass_through_unchanged);
   RUN(test_matchup_structs_default_to_not_present);
   RUN(test_current_matchup_carries_a_category_list);
+  RUN(test_standings_row_height_evenly_divides_the_available_space);
+  RUN(test_standings_row_height_adapts_to_row_count_without_overrunning);
+  RUN(test_standings_row_height_is_zero_for_zero_rows_not_a_divide_by_zero_crash);
   if (g_failures > 0) { std::cerr << g_failures << " failure(s)\n"; return 1; }
   std::cout << "OK\n";
   return 0;

@@ -56,3 +56,10 @@ struct NextMatchup {
 // it depends on font metrics this module has no access to. Does not re-derive
 // windowing/dedup/gap logic — that's already done server-side.
 std::vector<LayoutRow> buildLayout(const std::vector<StandingsRow>& rows);
+
+// Row height for a rowCount-row table (data rows plus any gap dividers)
+// evenly filling [tableTop, tableBottom]. Must be computed, not a constant —
+// see category_layout.h's categoryRowHeight for the same reasoning: roster
+// size plus an optional playoff-gap row varies the row count at runtime, and
+// a hardcoded height let rows run past the footer and off the panel.
+float standingsRowHeight(size_t rowCount, float tableTop, float tableBottom);
