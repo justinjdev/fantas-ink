@@ -5,10 +5,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 const getStoredRefreshTokenMock = vi.fn()
 const setStoredRefreshTokenMock = vi.fn()
 const setLatestStandingsMock = vi.fn()
+const getCachedLeagueSettingsMock = vi.fn()
+const setCachedLeagueSettingsMock = vi.fn()
 vi.mock('../lib/storage.js', () => ({
   getStoredRefreshToken: (...a: unknown[]) => getStoredRefreshTokenMock(...a),
   setStoredRefreshToken: (...a: unknown[]) => setStoredRefreshTokenMock(...a),
   setLatestStandings: (...a: unknown[]) => setLatestStandingsMock(...a),
+  getCachedLeagueSettings: (...a: unknown[]) => getCachedLeagueSettingsMock(...a),
+  setCachedLeagueSettings: (...a: unknown[]) => setCachedLeagueSettingsMock(...a),
 }))
 
 const refreshAccessTokenMock = vi.fn()
@@ -22,8 +26,22 @@ vi.mock('../lib/fetchStandings.js', () => ({
 }))
 
 const transformStandingsMock = vi.fn()
+const parseAllTeamsMock = vi.fn()
+const formatRecordMock = vi.fn()
 vi.mock('../lib/transform.js', () => ({
   transformStandings: (...a: unknown[]) => transformStandingsMock(...a),
+  parseAllTeams: (...a: unknown[]) => parseAllTeamsMock(...a),
+  formatRecord: (...a: unknown[]) => formatRecordMock(...a),
+}))
+
+const fetchLeagueSettingsMock = vi.fn()
+vi.mock('../lib/fetchLeagueSettings.js', () => ({
+  fetchLeagueSettings: (...a: unknown[]) => fetchLeagueSettingsMock(...a),
+}))
+
+const fetchMyMatchupsMock = vi.fn()
+vi.mock('../lib/fetchMyMatchup.js', () => ({
+  fetchMyMatchups: (...a: unknown[]) => fetchMyMatchupsMock(...a),
 }))
 
 const handler = (await import('./cron.js')).default
@@ -49,6 +67,10 @@ describe('GET /api/cron', () => {
       YAHOO_LEAGUE_KEY: '453.l.1',
       YAHOO_MY_TEAM_KEY: '453.l.1.t.7',
     }
+    // Sane defaults so tests unrelated to settings/matchups don't exercise
+    // the degrade-on-failure paths incidentally.
+    getCachedLeagueSettingsMock.mockResolvedValue({ categories: [], playoffTeams: null })
+    fetchMyMatchupsMock.mockResolvedValue({})
   })
 
   it('rejects requests without the correct CRON_SECRET bearer token', async () => {
@@ -76,7 +98,7 @@ describe('GET /api/cron', () => {
     getStoredRefreshTokenMock.mockResolvedValue('stored-refresh-token')
     refreshAccessTokenMock.mockResolvedValue({ accessToken: 'access-1', refreshToken: 'rotated-refresh', expiresIn: 3600 })
     fetchLeagueStandingsMock.mockResolvedValue({ raw: true })
-    transformStandingsMock.mockReturnValue({ asOf: 'x', myTeamKey: '453.l.1.t.7', rows: [] })
+    transformStandingsMock.mockReturnValue({ asOf: 'x', myTeamKey: '453.l.1.t.7', leagueName: 'Test League', rows: [] })
 
     const req = { headers: { authorization: 'Bearer cron-secret' } } as unknown as VercelRequest
     const res = mockRes()
@@ -99,7 +121,7 @@ describe('GET /api/cron', () => {
     getStoredRefreshTokenMock.mockResolvedValue(null)
     refreshAccessTokenMock.mockResolvedValue({ accessToken: 'access-1', refreshToken: 'rotated-refresh', expiresIn: 3600 })
     fetchLeagueStandingsMock.mockResolvedValue({ raw: true })
-    transformStandingsMock.mockReturnValue({ asOf: 'x', myTeamKey: '453.l.1.t.7', rows: [] })
+    transformStandingsMock.mockReturnValue({ asOf: 'x', myTeamKey: '453.l.1.t.7', leagueName: 'Test League', rows: [] })
 
     const req = { headers: { authorization: 'Bearer cron-secret' } } as unknown as VercelRequest
     const res = mockRes()
@@ -121,5 +143,31 @@ describe('GET /api/cron', () => {
 
     expect(setLatestStandingsMock).not.toHaveBeenCalled()
     expect(res.status).toHaveBeenCalledWith(500)
+  })
+
+  it('still publishes standings when the matchup fetch fails (matchups degrade independently)', async () => {
+    getStoredRefreshTokenMock.mockResolvedValue('stored-refresh-token')
+    refreshAccessTokenMock.mockResolvedValue({ accessToken: 'access-1', refreshToken: 'rotated-refresh', expiresIn: 3600 })
+    fetchLeagueStandingsMock.mockResolvedValue({ raw: true })
+    transformStandingsMock.mockReturnValue({
+      asOf: 'x',
+      myTeamKey: '453.l.1.t.7',
+      leagueName: 'Test League',
+      rows: [{ rank: 1, name: 'Cellar Dwellers', wins: 5, losses: 2, ties: 0, winPct: '.714', streak: 'W2', isMe: true }],
+    })
+    fetchMyMatchupsMock.mockRejectedValue(new Error('Yahoo matchups request failed: 500'))
+
+    const req = { headers: { authorization: 'Bearer cron-secret' } } as unknown as VercelRequest
+    const res = mockRes()
+
+    await handler(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(setLatestStandingsMock).toHaveBeenCalled()
+    const written = setLatestStandingsMock.mock.calls[0][0]
+    expect(written.currentMatchup).toBeNull()
+    expect(written.lastMatchup).toBeNull()
+    expect(written.nextMatchup).toBeNull()
+    expect(written.rows).toHaveLength(1)
   })
 })
