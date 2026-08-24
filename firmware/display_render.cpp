@@ -267,10 +267,14 @@ void renderCategoryPage(Display& display, const std::string& myTeamName, const C
 
       const int meColX = 300, oppColX = 500, labelColX = 400;
       display.setFont(&FreeSansBold9pt7b);
-      std::string myUpper = truncateToWidth(display, myTeamName, 280);
+      // Uppercase before measuring: capitals are wider than lowercase, so
+      // fitting the mixed-case string would overflow once it was uppercased.
+      std::string myUpper = myTeamName;
       for (auto& c : myUpper) c = toupper(static_cast<unsigned char>(c));
-      std::string oppUpper = truncateToWidth(display, current.opponent, 280);
+      myUpper = truncateToWidth(display, myUpper, 280);
+      std::string oppUpper = current.opponent;
       for (auto& c : oppUpper) c = toupper(static_cast<unsigned char>(c));
+      oppUpper = truncateToWidth(display, oppUpper, 280);
       printAligned(display, myUpper, meColX, 108, Align::Right);
       printAligned(display, oppUpper, oppColX, 108, Align::Left);
       hrule(display, 20, 118, 780);
