@@ -70,7 +70,7 @@ clang++ -std=c++17 firmware/test/display_layout_test.cpp firmware/display_layout
 clang++ -std=c++17 firmware/test/category_layout_test.cpp firmware/category_layout.cpp -o /tmp/category_layout_test && /tmp/category_layout_test
 ```
 
-Each prints its test names and `OK`, and exits non-zero on failure. Run both
+Each prints its test names and `OK`, and exits non-zero on failure. Run all three
 from the repository root before flashing. Everything else (network, NVS,
 panel) needs the manual pass below.
 
