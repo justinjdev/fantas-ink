@@ -59,6 +59,13 @@ void test_mixed_gap_and_data_rows_in_one_call() {
   CHECK_EQ(result[2].rank, 8);
 }
 
+void test_winPct_and_streak_pass_through_unchanged() {
+  std::vector<StandingsRow> rows = { {false, 1, "Team A", 10, 2, 0, false, ".833", "W4"} };
+  auto result = buildLayout(rows, 12);
+  CHECK_EQ(result[0].winPct, std::string(".833"));
+  CHECK_EQ(result[0].streak, std::string("W4"));
+}
+
 int main() {
   std::cout << "display_layout_test\n";
   RUN(test_short_name_passes_through_unchanged);
@@ -68,6 +75,7 @@ int main() {
   RUN(test_empty_input_returns_empty_output);
   RUN(test_name_exactly_at_max_chars_is_not_truncated);
   RUN(test_mixed_gap_and_data_rows_in_one_call);
+  RUN(test_winPct_and_streak_pass_through_unchanged);
   if (g_failures > 0) { std::cerr << g_failures << " failure(s)\n"; return 1; }
   std::cout << "OK\n";
   return 0;

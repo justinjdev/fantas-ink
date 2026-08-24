@@ -13,6 +13,8 @@ struct StandingsRow {
   int losses = 0;
   int ties = 0;
   bool isMe = false;
+  std::string winPct;
+  std::string streak;
 };
 
 struct LayoutRow {
@@ -23,6 +25,8 @@ struct LayoutRow {
   int losses = 0;
   int ties = 0;
   bool isMe = false;
+  std::string winPct;
+  std::string streak;
 };
 
 constexpr size_t MAX_NAME_CHARS = 12;
