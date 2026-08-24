@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { transformStandings, formatWinPct } from './transform.js'
+import { transformStandings, formatWinPct, formatStreak } from './transform.js'
 
-function makeTeam(rank: number, teamKey: string, wins: number, losses: number, ties = 0) {
+function makeTeam(rank: number, teamKey: string, wins: number, losses: number, ties = 0, streak = { type: 'wins', value: '1' }) {
   return {
     team: [
       [{ team_key: teamKey }, { name: `Team ${rank}` }],
@@ -9,6 +9,7 @@ function makeTeam(rank: number, teamKey: string, wins: number, losses: number, t
         team_standings: {
           rank,
           outcome_totals: { wins: String(wins), losses: String(losses), ties: String(ties) },
+          streak,
         },
       },
     ],
@@ -50,6 +51,24 @@ describe('formatWinPct', () => {
 
   it('returns .000 for zero games played rather than dividing by zero', () => {
     expect(formatWinPct(0, 0, 0)).toBe('.000')
+  })
+})
+
+describe('formatStreak', () => {
+  it('formats a winning streak', () => {
+    expect(formatStreak({ type: 'wins', value: '4' })).toBe('W4')
+  })
+
+  it('formats a losing streak', () => {
+    expect(formatStreak({ type: 'losses', value: '2' })).toBe('L2')
+  })
+
+  it('formats a tie streak', () => {
+    expect(formatStreak({ type: 'ties', value: '1' })).toBe('T1')
+  })
+
+  it('accepts a numeric value, not just a string', () => {
+    expect(formatStreak({ type: 'wins', value: 3 })).toBe('W3')
   })
 })
 
@@ -112,6 +131,7 @@ describe('transformStandings', () => {
     const rankOne = result.rows.find((r) => 'rank' in r && r.rank === 1)
     expect(rankOne).toMatchObject({ wins: 15, losses: 0, ties: 0 })
     expect(rankOne).toMatchObject({ winPct: '1.000' })
+    expect(rankOne).toMatchObject({ streak: 'W1' })
   })
 
   it('handles a small league where top 3 and window cover everyone (8 teams, myRank=5)', () => {

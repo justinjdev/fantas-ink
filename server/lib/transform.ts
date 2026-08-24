@@ -7,7 +7,7 @@ export interface StandingsPayload {
 }
 
 export type StandingsRow =
-  | { rank: number; name: string; wins: number; losses: number; ties: number; winPct: string; isMe?: true }
+  | { rank: number; name: string; wins: number; losses: number; ties: number; winPct: string; streak: string; isMe?: true }
   | { gap: true }
 
 interface ParsedTeam {
@@ -17,6 +17,7 @@ interface ParsedTeam {
   wins: number
   losses: number
   ties: number
+  streak: { type: string; value: string | number }
 }
 
 export function formatWinPct(wins: number, losses: number, ties: number): string {
@@ -26,6 +27,11 @@ export function formatWinPct(wins: number, losses: number, ties: number): string
   return formatted.startsWith('0.') ? formatted.slice(1) : formatted
 }
 
+export function formatStreak(streak: { type: string; value: string | number }): string {
+  const letter = streak.type === 'wins' ? 'W' : streak.type === 'losses' ? 'L' : 'T'
+  return `${letter}${streak.value}`
+}
+
 function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
   const teamArray = (rawTeamWrapper as { team: unknown[] }).team
   const teamKey = findByKey(teamArray, 'team_key') as string
@@ -33,6 +39,7 @@ function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
   const standings = findByKey(teamArray, 'team_standings') as {
     rank: number | string
     outcome_totals: { wins: string; losses: string; ties: string }
+    streak: { type: string; value: string | number }
   }
 
   return {
@@ -42,6 +49,7 @@ function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
     wins: Number(standings.outcome_totals.wins),
     losses: Number(standings.outcome_totals.losses),
     ties: Number(standings.outcome_totals.ties),
+    streak: standings.streak,
   }
 }
 
@@ -83,6 +91,7 @@ export function transformStandings(rawYahooJson: unknown, myTeamKey: string, asO
       losses: team.losses,
       ties: team.ties,
       winPct: formatWinPct(team.wins, team.losses, team.ties),
+      streak: formatStreak(team.streak),
       ...(team.teamKey === myTeamKey ? { isMe: true as const } : {}),
     })
     previousRank = rank
