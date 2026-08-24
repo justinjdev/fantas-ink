@@ -57,6 +57,7 @@ Display& initDisplay() {
   display.epd2.selectSPI(hspi, SPISettings(4000000, MSBFIRST, SPI_MODE0));
   display.init(115200);
   display.setRotation(0);
+  display.setTextWrap(false);
   return display;
 }
 
@@ -241,9 +242,9 @@ void renderCategoryPage(Display& display, const std::string& myTeamName, const C
       const int meColX = 300, oppColX = 500, labelColX = 400;
       display.setFont(&FreeSansBold9pt7b);
       std::string myUpper = myTeamName;
-      for (auto& c : myUpper) c = toupper(c);
+      for (auto& c : myUpper) c = toupper(static_cast<unsigned char>(c));
       std::string oppUpper = current.opponent;
-      for (auto& c : oppUpper) c = toupper(c);
+      for (auto& c : oppUpper) c = toupper(static_cast<unsigned char>(c));
       printAligned(display, myUpper, meColX, 108, Align::Right);
       printAligned(display, oppUpper, oppColX, 108, Align::Left);
       hrule(display, 20, 118, 780);

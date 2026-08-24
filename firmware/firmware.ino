@@ -5,6 +5,7 @@
 #include "display_render.h"
 #include "network_api.h"
 #include "nvs_cache.h"
+#include "driver/rtc_io.h"
 
 static const int WAKE_HOUR = 8;
 static const int WAKE_MINUTE = 0;
@@ -15,10 +16,13 @@ static const uint32_t FETCH_BACKOFF_BASE_MS = 2000;
 static const uint64_t FALLBACK_RETRY_SLEEP_MICROS = 60ULL * 60 * 1000000ULL;
 static const gpio_num_t BUTTON_PIN = GPIO_NUM_4; // provisional - confirm against real hardware
 RTC_DATA_ATTR int currentPage = 0; // 0 = standings/matchup, 1 = category breakdown
+RTC_DATA_ATTR bool lastFetchWasFresh = false;
 
 static void armWakeSources(uint64_t sleepMicros) {
   esp_sleep_enable_timer_wakeup(sleepMicros);
   esp_sleep_enable_ext0_wakeup(BUTTON_PIN, 1); // wake on HIGH (button pulls the pin high when pressed)
+  rtc_gpio_pullup_dis(BUTTON_PIN);
+  rtc_gpio_pulldown_en(BUTTON_PIN);
 }
 
 static void goToSleep() {
@@ -44,7 +48,7 @@ static void goToSleep() {
 
 static void handleButtonWake() {
   currentPage = currentPage == 0 ? 1 : 0;
-  Serial.printf("Button wake: switching to page %d\n", currentPage);
+  Serial.printf("Button wake: switching to page %d\n", currentPage + 1);
 
   Display& display = initDisplay();
 
@@ -54,7 +58,7 @@ static void handleButtonWake() {
   }
   if (cached.success && !cached.rows.empty()) {
     auto layout = buildLayout(cached.rows);
-    std::string footer = "Last updated: " + std::string(cached.asOf.c_str());
+    std::string footer = lastFetchWasFresh ? std::string("") : ("Last updated: " + std::string(cached.asOf.c_str()));
     if (currentPage == 0) {
       renderStandingsPage(display, cached.leagueName.c_str(), layout, cached.hasPlayoffTeams,
                           cached.playoffTeams, cached.currentMatchup, cached.lastMatchup,
@@ -80,13 +84,7 @@ static void handleButtonWake() {
     delay(20);
   }
 
-  time_t now;
-  time(&now);
-  uint64_t sleepMicros = now < PLAUSIBLE_TIME_THRESHOLD
-    ? FALLBACK_RETRY_SLEEP_MICROS
-    : computeSleepMicros(now, WAKE_HOUR, WAKE_MINUTE);
-  armWakeSources(sleepMicros);
-  esp_deep_sleep_start();
+  goToSleep();
 }
 
 void setup() {
@@ -94,6 +92,7 @@ void setup() {
 
   esp_sleep_wakeup_cause_t wakeCause = esp_sleep_get_wakeup_cause();
   if (wakeCause == ESP_SLEEP_WAKEUP_EXT0) {
+    rtc_gpio_deinit(BUTTON_PIN);
     pinMode(BUTTON_PIN, INPUT_PULLDOWN);
     handleButtonWake();
     return;
@@ -162,6 +161,7 @@ void setup() {
 
   Serial.println("Display: hibernating panel");
   hibernateDisplay(display);
+  lastFetchWasFresh = haveFreshData;
   goToSleep();
 }
 

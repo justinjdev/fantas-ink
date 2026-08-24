@@ -60,7 +60,7 @@ static CurrentMatchup parseCurrentMatchup(JsonVariant node) {
     stat.label = catObj["label"].as<std::string>();
     stat.mine = catObj["mine"].as<double>();
     stat.theirs = catObj["theirs"].as<double>();
-    stat.higherWins = catObj["higherWins"].as<bool>();
+    stat.higherWins = catObj["higherWins"] | true;
     m.categories.push_back(stat);
   }
   return m;
