@@ -2,9 +2,11 @@
 import { put, head, BlobNotFoundError } from '@vercel/blob'
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto'
 import type { StandingsPayload } from './transform.js'
+import type { LeagueSettings } from './leagueSettings.js'
 
 const REFRESH_TOKEN_PATH = 'private/yahoo-refresh-token.json'
 const STANDINGS_PATH = 'latest.json'
+const LEAGUE_SETTINGS_PATH = 'league-settings.json'
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 12
 const AUTH_TAG_LENGTH = 16
@@ -78,6 +80,20 @@ export async function getLatestStandings(): Promise<StandingsPayload | null> {
 
 export async function setLatestStandings(payload: StandingsPayload): Promise<void> {
   await put(STANDINGS_PATH, JSON.stringify(payload), {
+    access: 'public',
+    contentType: 'application/json',
+    cacheControlMaxAge: MIN_CACHE_CONTROL_MAX_AGE,
+    addRandomSuffix: false,
+    allowOverwrite: true,
+  })
+}
+
+export async function getCachedLeagueSettings(): Promise<LeagueSettings | null> {
+  return readJsonBlob<LeagueSettings>(LEAGUE_SETTINGS_PATH)
+}
+
+export async function setCachedLeagueSettings(settings: LeagueSettings): Promise<void> {
+  await put(LEAGUE_SETTINGS_PATH, JSON.stringify(settings), {
     access: 'public',
     contentType: 'application/json',
     cacheControlMaxAge: MIN_CACHE_CONTROL_MAX_AGE,
