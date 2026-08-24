@@ -1,6 +1,8 @@
 // firmware/display_render.cpp
 #include "display_render.h"
 #include <SPI.h>
+#include <cctype>
+#include <cstdio>
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSansBold9pt7b.h>
 #include <Fonts/FreeSansBold12pt7b.h>
@@ -196,6 +198,89 @@ void renderStandingsPage(Display& display, const std::string& leagueName, const 
     display.setFont(&FreeSans9pt7b);
     if (!footer.empty()) printAligned(display, footer, 20, 468);
     printAligned(display, "PAGE 1/2 - button > categories", 780, 468, Align::Right);
+  } while (display.nextPage());
+}
+
+static std::string formatStatValue(double value) {
+  if (value == static_cast<long long>(value)) {
+    return std::to_string(static_cast<long long>(value));
+  }
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.3f", value);
+  return std::string(buf);
+}
+
+void renderCategoryPage(Display& display, const std::string& myTeamName, const CurrentMatchup& current,
+                         const std::string& footer) {
+  display.setTextColor(GxEPD_BLACK);
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+
+    if (!current.present) {
+      display.setFont(&FreeSansBold18pt7b);
+      printAligned(display, "No matchup this week", 20, 200);
+    } else if (current.categories.empty()) {
+      // Matchup exists (status/tally are valid) but the category settings
+      // fetch failed server-side - a different failure than no matchup at
+      // all, so it gets its own message rather than reusing the one above.
+      display.setFont(&FreeSansBold18pt7b);
+      printAligned(display, "vs " + current.opponent, 20, 38);
+      display.setFont(&FreeSansBold24pt7b);
+      printAligned(display, current.status + "  " + current.tally, 20, 70);
+      hrule(display, 20, 88, 780);
+      display.setFont(&FreeSansBold12pt7b);
+      printAligned(display, "Category breakdown unavailable", 20, 200);
+    } else {
+      display.setFont(&FreeSansBold18pt7b);
+      printAligned(display, "vs " + current.opponent, 20, 38);
+      display.setFont(&FreeSansBold24pt7b);
+      printAligned(display, current.status + "  " + current.tally, 20, 70);
+      hrule(display, 20, 88, 780);
+
+      const int meColX = 300, oppColX = 500, labelColX = 400;
+      display.setFont(&FreeSansBold9pt7b);
+      std::string myUpper = myTeamName;
+      for (auto& c : myUpper) c = toupper(c);
+      std::string oppUpper = current.opponent;
+      for (auto& c : oppUpper) c = toupper(c);
+      printAligned(display, myUpper, meColX, 108, Align::Right);
+      printAligned(display, oppUpper, oppColX, 108, Align::Left);
+      hrule(display, 20, 118, 780);
+
+      const float tableTop = 118.0f, tableBottom = 440.0f;
+      float rowH = categoryRowHeight(current.categories.size(), tableTop, tableBottom);
+      float y = tableTop;
+      for (const auto& cat : current.categories) {
+        int baseline = static_cast<int>(y + rowH / 2.0f) + 7;
+        bool meLeads = categoryLeaderIsMe(cat);
+        bool oppLeads = categoryLeaderIsThem(cat);
+
+        display.setFont(meLeads ? &FreeMonoBold12pt7b : &FreeMono12pt7b);
+        printAligned(display, formatStatValue(cat.mine), meColX, baseline, Align::Right);
+        if (meLeads) {
+          display.setFont(&FreeSansBold9pt7b);
+          printAligned(display, ">", meColX + 10, baseline);
+        }
+
+        display.setFont(&FreeSansBold9pt7b);
+        printAligned(display, cat.label, labelColX, baseline, Align::Center);
+
+        display.setFont(oppLeads ? &FreeMonoBold12pt7b : &FreeMono12pt7b);
+        printAligned(display, formatStatValue(cat.theirs), oppColX, baseline, Align::Left);
+        if (oppLeads) {
+          display.setFont(&FreeSansBold9pt7b);
+          printAligned(display, "<", oppColX - 10, baseline, Align::Right);
+        }
+
+        y += rowH;
+      }
+    }
+
+    hrule(display, 20, 452, 780);
+    display.setFont(&FreeSans9pt7b);
+    if (!footer.empty()) printAligned(display, footer, 20, 468);
+    printAligned(display, "PAGE 2/2 - button > standings", 780, 468, Align::Right);
   } while (display.nextPage());
 }
 
