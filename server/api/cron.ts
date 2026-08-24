@@ -17,19 +17,40 @@ import { parseLeagueSettings, type LeagueSettings } from '../lib/leagueSettings.
 import { parseMatchups } from '../lib/matchup.js'
 import { timingSafeStringEqual } from '../lib/safeCompare.js'
 
+const EMPTY_LEAGUE_SETTINGS: LeagueSettings = { categories: [], playoffTeams: null }
+
 async function resolveLeagueSettings(accessToken: string, leagueKey: string): Promise<LeagueSettings> {
-  const cached = await getCachedLeagueSettings()
+  let cached: LeagueSettings | null = null
+  try {
+    cached = await getCachedLeagueSettings()
+  } catch (err) {
+    console.error('league settings cache read failed, falling back to a live fetch', err)
+  }
   if (cached) return cached
 
+  let raw: unknown
   try {
-    const raw = await fetchLeagueSettings(accessToken, leagueKey)
-    const settings = parseLeagueSettings(raw)
-    await setCachedLeagueSettings(settings)
-    return settings
+    raw = await fetchLeagueSettings(accessToken, leagueKey)
   } catch (err) {
     console.error('league settings fetch failed, proceeding without playoff line or categories', err)
-    return { categories: [], playoffTeams: null }
+    return EMPTY_LEAGUE_SETTINGS
   }
+
+  let settings: LeagueSettings
+  try {
+    settings = parseLeagueSettings(raw)
+  } catch (err) {
+    console.error('league settings parse failed, proceeding without playoff line or categories', err)
+    return EMPTY_LEAGUE_SETTINGS
+  }
+
+  try {
+    await setCachedLeagueSettings(settings)
+  } catch (err) {
+    console.error('league settings cache write failed, proceeding with the freshly fetched settings', err)
+  }
+
+  return settings
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {

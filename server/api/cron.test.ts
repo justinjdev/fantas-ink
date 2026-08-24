@@ -170,4 +170,54 @@ describe('GET /api/cron', () => {
     expect(written.nextMatchup).toBeNull()
     expect(written.rows).toHaveLength(1)
   })
+
+  it('still publishes standings when the settings fetch fails on a cache miss', async () => {
+    getStoredRefreshTokenMock.mockResolvedValue('stored-refresh-token')
+    refreshAccessTokenMock.mockResolvedValue({ accessToken: 'access-1', refreshToken: 'rotated-refresh', expiresIn: 3600 })
+    fetchLeagueStandingsMock.mockResolvedValue({ raw: true })
+    transformStandingsMock.mockReturnValue({
+      asOf: 'x',
+      myTeamKey: '453.l.1.t.7',
+      leagueName: 'Test League',
+      rows: [{ rank: 1, name: 'Cellar Dwellers', wins: 5, losses: 2, ties: 0, winPct: '.714', streak: 'W2', isMe: true }],
+    })
+    getCachedLeagueSettingsMock.mockResolvedValue(null)
+    fetchLeagueSettingsMock.mockRejectedValue(new Error('Yahoo league settings request failed: 500'))
+
+    const req = { headers: { authorization: 'Bearer cron-secret' } } as unknown as VercelRequest
+    const res = mockRes()
+
+    await handler(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(setLatestStandingsMock).toHaveBeenCalled()
+    const written = setLatestStandingsMock.mock.calls[0][0]
+    expect(written.playoffTeams).toBeNull()
+    expect(written.rows).toHaveLength(1)
+  })
+
+  it('still publishes standings when the settings cache read fails', async () => {
+    getStoredRefreshTokenMock.mockResolvedValue('stored-refresh-token')
+    refreshAccessTokenMock.mockResolvedValue({ accessToken: 'access-1', refreshToken: 'rotated-refresh', expiresIn: 3600 })
+    fetchLeagueStandingsMock.mockResolvedValue({ raw: true })
+    transformStandingsMock.mockReturnValue({
+      asOf: 'x',
+      myTeamKey: '453.l.1.t.7',
+      leagueName: 'Test League',
+      rows: [{ rank: 1, name: 'Cellar Dwellers', wins: 5, losses: 2, ties: 0, winPct: '.714', streak: 'W2', isMe: true }],
+    })
+    getCachedLeagueSettingsMock.mockRejectedValue(new Error('blob service unavailable'))
+    fetchLeagueSettingsMock.mockRejectedValue(new Error('Yahoo league settings request failed: 500'))
+
+    const req = { headers: { authorization: 'Bearer cron-secret' } } as unknown as VercelRequest
+    const res = mockRes()
+
+    await handler(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    expect(setLatestStandingsMock).toHaveBeenCalled()
+    const written = setLatestStandingsMock.mock.calls[0][0]
+    expect(written.playoffTeams).toBeNull()
+    expect(written.rows).toHaveLength(1)
+  })
 })
