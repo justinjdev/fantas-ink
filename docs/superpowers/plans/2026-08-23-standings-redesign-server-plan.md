@@ -986,12 +986,14 @@ describe('parseMatchups', () => {
   it('builds the last matchup from the most recent postevent entry', () => {
     const raw = makeRawMatchups({
       '0': makeMatchup(18, 'postevent', { '1': '5', '2': '3', '26': '3.10' }, { '1': '2', '2': '9', '26': '2.90' }),
-      '1': makeMatchup(19, 'postevent', { '1': '3', '2': '5', '26': '2.60' }, { '1': '5', '2': '5', '26': '2.85' }),
+      '1': makeMatchup(19, 'postevent', { '1': '8', '2': '5', '26': '2.60' }, { '1': '5', '2': '9', '26': '2.85' }),
     })
 
     const result = parseMatchups(raw, '453.l.1.t.8', CATEGORIES)
 
     // Week 19 is more recent than week 18 — must pick that one, not the first in the container.
+    // Week 19 tallies WON 2-1-0 (G mine, A theirs, GAA mine since lower wins); week 18 tallies
+    // LOST 1-2-0. The two are distinguishable, so this genuinely pins which week was selected.
     expect(result.last).toEqual({ opponent: 'Puck Norris', status: 'WON', tally: '2-1-0' })
   })
 
@@ -1271,7 +1273,7 @@ Create `server/lib/asciiSanitize.ts`:
 export function sanitizeAscii(text: string): string {
   const stripped = text
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '') // combining diacritical marks
+    .replace(/[\u0300-\u036f]/g, '') // combining diacritical marks
     .replace(/[^\x20-\x7E]/g, '')
   return stripped.replace(/\s+/g, ' ').trim()
 }
@@ -1327,14 +1329,35 @@ import { sanitizeAscii } from './asciiSanitize.js'
 
 (inside `parseMatchupTeam`, replacing the existing unsanitized assignment)
 
-Add to `server/lib/matchup.test.ts`:
+In `server/lib/matchup.test.ts`, give `makeMatchup` an optional trailing opponent-name parameter so
+the non-ASCII name can be built into the fixture. Mutating the constructed object after the fact
+(`raw.fantasy_content.team[1].matchups['0']...`) does not typecheck — TypeScript widens
+`fantasy_content.team` to a union that includes the array branch, so the property access is
+`error TS2339`, and `tsconfig.json` includes `lib`/`api`, so test files are typechecked.
+
+```typescript
+function makeMatchup(
+  week: number,
+  status: string,
+  myStats: Record<string, string>,
+  theirStats: Record<string, string>,
+  opponentName = 'Puck Norris',
+) {
+```
+
+and inside it, pass `opponentName` through in place of the hardcoded `'Puck Norris'`:
+
+```typescript
+        '1': { team: makeMatchupTeam('453.l.1.t.2', opponentName, theirStats).team },
+```
+
+Every existing call site keeps working unchanged via the default. Then add:
 
 ```typescript
   it('sanitizes non-ASCII characters out of the opponent name', () => {
     const raw = makeRawMatchups({
-      '0': makeMatchup(20, 'midevent', { '1': '10' }, { '1': '5' }),
+      '0': makeMatchup(20, 'midevent', { '1': '10' }, { '1': '5' }, 'Café Team 🏒'),
     })
-    raw.fantasy_content.team[1].matchups['0'].matchup.teams['1'].team[0][1].name = 'Café Team 🏒'
     const categories: CategoryDef[] = [{ statId: '1', label: 'G', higherWins: true }]
 
     const result = parseMatchups(raw, '453.l.1.t.8', categories)
