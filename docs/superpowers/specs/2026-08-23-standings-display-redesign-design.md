@@ -191,8 +191,8 @@ inverted band — `fillRect` in black, then white text on top. Not used anywhere
 renderer.
 
 **Page 1 — standings + matchup summary** (800×480):
-- Header: `leagueName` (truncated to a new `MAX_LEAGUE_NAME_CHARS` if needed, same truncate-to-fit
-  pattern as team names) at (20, 40), 24pt bold. Rule at y=54, full width.
+- Header: `leagueName` (measured with `getTextBounds` and truncated to the available pixel width if
+  needed, same width-based fit as team names) at (20, 40), 24pt bold. Rule at y=54, full width.
 - Vertical divider at x=460, y 64–452, separating table (left) from sidebar (right).
 - Table: top=74, row height 40, columns at x = {rank: 20, team: 56, W-L-T: 235, win%: 315,
   streak: 385}. Gap row: a plain 1px rule at the row's vertical midpoint instead of text. `isMe` row:
@@ -315,3 +315,7 @@ Extends the original spec's Testing Approach; the two pure-function host tests r
 - Exact column/row pixel constants — decided at the proportions/structure level against
   canvas-approximated fonts; needs a pass against real on-device `getTextBounds()` once the panel and
   vendored fonts can be tested together.
+- Category count ceiling — 13 categories is the safe maximum at the font sizes in play: `categoryRowHeight`
+  has no floor, and the 118–440 budget gives 24.77px per row at 13 against `FreeMono12pt7b`'s 24px line
+  height, but 14 categories drops it to 23.0px and rows begin to overlap. Whoever fills in the real league
+  category list should check it against this.
