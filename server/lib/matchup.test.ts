@@ -112,4 +112,15 @@ describe('parseMatchups', () => {
     expect(result.current?.status).toBe('TIED')
     expect(result.current?.tally).toBe('0-0-1')
   })
+
+  it('sanitizes non-ASCII characters out of the opponent name', () => {
+    const raw = makeRawMatchups({
+      '0': makeMatchup(20, 'midevent', { '1': '10' }, { '1': '5' }, 'Café Team 🏒'),
+    })
+    const categories: CategoryDef[] = [{ statId: '1', label: 'G', higherWins: true }]
+
+    const result = parseMatchups(raw, '453.l.1.t.8', categories)
+
+    expect(result.current?.opponent).toBe('Cafe Team')
+  })
 })

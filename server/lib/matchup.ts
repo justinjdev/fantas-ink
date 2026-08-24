@@ -1,5 +1,6 @@
 import { findByKey, numberedEntries } from './yahooJson.js'
 import type { CategoryDef } from './leagueSettings.js'
+import { sanitizeAscii } from './asciiSanitize.js'
 
 export interface CategoryStat {
   label: string
@@ -48,7 +49,7 @@ interface RawMatchup {
 function parseMatchupTeam(teamWrapper: unknown): RawMatchupTeam {
   const teamArray = (teamWrapper as { team: unknown[] }).team
   const teamKey = findByKey(teamArray, 'team_key') as string
-  const name = findByKey(teamArray, 'name') as string
+  const name = sanitizeAscii(findByKey(teamArray, 'name') as string)
   const statsContainer = findByKey(teamArray, 'team_stats') as { stats?: unknown[] } | undefined
   const statEntries = Array.isArray(statsContainer?.stats) ? statsContainer!.stats : []
   const stats: Record<string, string> = {}

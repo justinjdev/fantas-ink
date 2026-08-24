@@ -1,4 +1,5 @@
 import { findByKey, numberedEntries } from './yahooJson.js'
+import { sanitizeAscii } from './asciiSanitize.js'
 
 export interface StandingsPayload {
   asOf: string
@@ -40,7 +41,7 @@ export function formatRecord(wins: number, losses: number, ties: number): string
 function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
   const teamArray = (rawTeamWrapper as { team: unknown[] }).team
   const teamKey = findByKey(teamArray, 'team_key') as string
-  const name = findByKey(teamArray, 'name') as string
+  const name = sanitizeAscii(findByKey(teamArray, 'name') as string)
   const standings = findByKey(teamArray, 'team_standings') as {
     rank: number | string
     outcome_totals: { wins: string; losses: string; ties: string }
@@ -66,7 +67,7 @@ export function parseAllTeams(rawYahooJson: unknown): ParsedTeam[] {
 }
 
 export function transformStandings(rawYahooJson: unknown, myTeamKey: string, asOf: string): StandingsPayload {
-  const leagueName = findByKey(rawYahooJson, 'name') as string
+  const leagueName = sanitizeAscii(findByKey(rawYahooJson, 'name') as string)
   const teams = parseAllTeams(rawYahooJson)
   const myTeam = teams.find((t) => t.teamKey === myTeamKey)
   if (!myTeam) {

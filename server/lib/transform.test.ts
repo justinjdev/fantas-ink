@@ -148,6 +148,13 @@ describe('transformStandings', () => {
 
     expect(result.leagueName).toBe('Test League')
   })
+
+  it('sanitizes non-ASCII characters out of team and league names', () => {
+    const raw = makeRawStandings(16)
+    raw.fantasy_content.league[0].name = 'Café Legends 🏒'
+    const result = transformStandings(raw, '453.l.1.t.8', ASOF)
+    expect(result.leagueName).toBe('Cafe Legends')
+  })
 })
 
 describe('parseAllTeams', () => {
