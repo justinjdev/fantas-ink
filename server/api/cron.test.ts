@@ -288,4 +288,34 @@ describe('GET /api/cron', () => {
     expect(written.currentMatchup).toBeNull()
     expect(written.lastMatchup).toBeNull()
   })
+
+  it('publishes a real computed currentMatchup when categories ARE available (guards the inverse of the null-out branch)', async () => {
+    getStoredRefreshTokenMock.mockResolvedValue('stored-refresh-token')
+    refreshAccessTokenMock.mockResolvedValue({ accessToken: 'access-1', refreshToken: 'rotated-refresh', expiresIn: 3600 })
+    fetchLeagueStandingsMock.mockResolvedValue({ raw: true })
+    transformStandingsMock.mockReturnValue({
+      asOf: 'x',
+      myTeamKey: '453.l.1.t.7',
+      leagueName: 'Test League',
+      rows: [{ rank: 1, name: 'Cellar Dwellers', wins: 5, losses: 2, ties: 0, winPct: '.714', streak: 'W2', isMe: true }],
+    })
+    getCachedLeagueSettingsMock.mockResolvedValue({
+      categories: [{ statId: '1', label: 'G', higherWins: true }],
+      playoffTeams: 6,
+    })
+    fetchMyMatchupsMock.mockResolvedValue(
+      makeRawMatchups({ '0': makeMatchup(20, 'midevent', { '1': '14' }, { '1': '10' }) })
+    )
+
+    const req = { headers: { authorization: 'Bearer cron-secret' } } as unknown as VercelRequest
+    const res = mockRes()
+
+    await handler(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(200)
+    const written = setLatestStandingsMock.mock.calls[0][0]
+    expect(written.currentMatchup).not.toBeNull()
+    expect(written.currentMatchup.status).toBe('AHEAD')
+    expect(written.currentMatchup.tally).toBe('1-0-0')
+  })
 })
