@@ -46,6 +46,14 @@ interface RawMatchup {
   opponent: RawMatchupTeam
 }
 
+// Coerces a possibly-missing or non-numeric value to a real number so it
+// never reaches the JSON payload as NaN (which JSON.stringify turns into
+// null) or silently counts as a tie in tallyCategoryWins.
+function toSafeNumber(value: unknown): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
 function parseMatchupTeam(teamWrapper: unknown): RawMatchupTeam {
   const teamArray = (teamWrapper as { team: unknown[] }).team
   const teamKey = findByKey(teamArray, 'team_key') as string
@@ -69,7 +77,7 @@ function parseOneMatchup(matchupWrapper: unknown, myTeamKey: string): RawMatchup
   if (!me || !opponent) return null
 
   return {
-    week: Number(matchup.week),
+    week: toSafeNumber(matchup.week),
     status: String(matchup.status),
     me,
     opponent,
@@ -77,9 +85,9 @@ function parseOneMatchup(matchupWrapper: unknown, myTeamKey: string): RawMatchup
 }
 
 function parseAllMatchups(rawYahooJson: unknown, myTeamKey: string): RawMatchup[] {
-  const matchupsContainer = findByKey(rawYahooJson, 'matchups') as Record<string, unknown>
+  const matchupsContainer = findByKey(rawYahooJson, 'matchups')
   if (!matchupsContainer) return []
-  return numberedEntries(matchupsContainer)
+  return numberedEntries(matchupsContainer as Record<string, unknown>)
     .map((wrapper) => parseOneMatchup(wrapper, myTeamKey))
     .filter((m): m is RawMatchup => m !== null)
 }
@@ -87,8 +95,8 @@ function parseAllMatchups(rawYahooJson: unknown, myTeamKey: string): RawMatchup[
 function buildCategoryStats(matchup: RawMatchup, categories: CategoryDef[]): CategoryStat[] {
   return categories.map((cat) => ({
     label: cat.label,
-    mine: Number(matchup.me.stats[cat.statId]),
-    theirs: Number(matchup.opponent.stats[cat.statId]),
+    mine: toSafeNumber(matchup.me.stats[cat.statId]),
+    theirs: toSafeNumber(matchup.opponent.stats[cat.statId]),
     higherWins: cat.higherWins,
   }))
 }

@@ -17,7 +17,9 @@ import { parseLeagueSettings, type LeagueSettings } from '../lib/leagueSettings.
 import { parseMatchups } from '../lib/matchup.js'
 import { timingSafeStringEqual } from '../lib/safeCompare.js'
 
-const EMPTY_LEAGUE_SETTINGS: LeagueSettings = { categories: [], playoffTeams: null }
+function emptyLeagueSettings(): LeagueSettings {
+  return { categories: [], playoffTeams: null }
+}
 
 async function resolveLeagueSettings(accessToken: string, leagueKey: string): Promise<LeagueSettings> {
   let cached: LeagueSettings | null = null
@@ -33,7 +35,7 @@ async function resolveLeagueSettings(accessToken: string, leagueKey: string): Pr
     raw = await fetchLeagueSettings(accessToken, leagueKey)
   } catch (err) {
     console.error('league settings fetch failed, proceeding without playoff line or categories', err)
-    return EMPTY_LEAGUE_SETTINGS
+    return emptyLeagueSettings()
   }
 
   let settings: LeagueSettings
@@ -41,13 +43,16 @@ async function resolveLeagueSettings(accessToken: string, leagueKey: string): Pr
     settings = parseLeagueSettings(raw)
   } catch (err) {
     console.error('league settings parse failed, proceeding without playoff line or categories', err)
-    return EMPTY_LEAGUE_SETTINGS
+    return emptyLeagueSettings()
   }
 
-  try {
-    await setCachedLeagueSettings(settings)
-  } catch (err) {
-    console.error('league settings cache write failed, proceeding with the freshly fetched settings', err)
+  const parseYieldedSomething = settings.categories.length > 0 || settings.playoffTeams !== null
+  if (parseYieldedSomething) {
+    try {
+      await setCachedLeagueSettings(settings)
+    } catch (err) {
+      console.error('league settings cache write failed, proceeding with the freshly fetched settings', err)
+    }
   }
 
   return settings

@@ -29,8 +29,19 @@ export function formatWinPct(wins: number, losses: number, ties: number): string
   return formatted.startsWith('0.') ? formatted.slice(1) : formatted
 }
 
+// 'wins'/'losses'/'ties' are Yahoo's documented streak types, an unverified
+// guess pending real Yahoo API access. An unrecognized type (missing field,
+// renamed field, etc.) is logged rather than silently rendering as a
+// plausible-looking tie streak.
 export function formatStreak(streak: { type: string; value: string | number }): string {
-  const letter = streak.type === 'wins' ? 'W' : streak.type === 'losses' ? 'L' : 'T'
+  let letter: string
+  if (streak.type === 'wins') letter = 'W'
+  else if (streak.type === 'losses') letter = 'L'
+  else if (streak.type === 'ties') letter = 'T'
+  else {
+    console.warn(`transform: unrecognized streak type ${JSON.stringify(streak.type)}, defaulting to tie`)
+    letter = 'T'
+  }
   return `${letter}${streak.value}`
 }
 
@@ -45,8 +56,11 @@ function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
   const standings = findByKey(teamArray, 'team_standings') as {
     rank: number | string
     outcome_totals: { wins: string; losses: string; ties: string }
-    streak: { type: string; value: string | number }
+    streak?: { type: string; value: string | number }
   }
+  // streak is display-only; a team missing it (e.g. zero games played)
+  // must not take down the mandatory standings row.
+  const streak = standings.streak ?? { type: 'ties', value: 0 }
 
   return {
     teamKey,
@@ -55,7 +69,7 @@ function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
     wins: Number(standings.outcome_totals.wins),
     losses: Number(standings.outcome_totals.losses),
     ties: Number(standings.outcome_totals.ties),
-    streak: standings.streak,
+    streak,
   }
 }
 

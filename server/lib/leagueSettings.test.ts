@@ -52,4 +52,14 @@ describe('parseLeagueSettings', () => {
     const result = parseLeagueSettings({ fantasy_content: {} })
     expect(result).toEqual({ categories: [], playoffTeams: null })
   })
+
+  it('sanitizes non-ASCII characters out of a category label', () => {
+    const raw = makeRawSettings()
+    const secondLeagueEntry = raw.fantasy_content.league[1] as {
+      settings: { stat_categories: { stats: { stat: { display_name: string } }[] } }[]
+    }
+    secondLeagueEntry.settings[0].stat_categories.stats[0].stat.display_name = 'Café G 🏒'
+    const result = parseLeagueSettings(raw)
+    expect(result.categories[0]).toMatchObject({ label: 'Cafe G' })
+  })
 })

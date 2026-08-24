@@ -152,8 +152,13 @@ describe('transformStandings', () => {
   it('sanitizes non-ASCII characters out of team and league names', () => {
     const raw = makeRawStandings(16)
     raw.fantasy_content.league[0].name = 'Café Legends 🏒'
+    const secondLeagueEntry = raw.fantasy_content.league[1] as { standings: { teams: Record<string, unknown> }[] }
+    const teamOneWrapper = secondLeagueEntry.standings[0].teams['0'] as { team: unknown[] }
+    ;(teamOneWrapper.team[0] as unknown[])[1] = { name: 'Café Team 🏒' }
     const result = transformStandings(raw, '453.l.1.t.8', ASOF)
     expect(result.leagueName).toBe('Cafe Legends')
+    const rankOne = result.rows.find((r) => 'rank' in r && r.rank === 1)
+    expect(rankOne).toMatchObject({ name: 'Cafe Team' })
   })
 })
 

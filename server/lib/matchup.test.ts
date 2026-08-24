@@ -113,6 +113,25 @@ describe('parseMatchups', () => {
     expect(result.current?.tally).toBe('0-0-1')
   })
 
+  it('treats a category missing from a team stats entry as 0, not NaN or a tie', () => {
+    const raw = makeRawMatchups({
+      // '26' (GAA) is absent from both teams' stats entirely, e.g. a goalie
+      // category on a bye week or an id mismatch against league settings.
+      '0': makeMatchup(20, 'midevent', { '1': '14', '2': '18' }, { '1': '10', '2': '22' }),
+    })
+
+    const result = parseMatchups(raw, '453.l.1.t.8', CATEGORIES)
+
+    const gaa = result.current?.categories.find((c) => c.label === 'GAA')
+    expect(gaa).toEqual({ label: 'GAA', mine: 0, theirs: 0, higherWins: false })
+    expect(Number.isNaN(gaa?.mine)).toBe(false)
+    expect(Number.isNaN(gaa?.theirs)).toBe(false)
+    // G: mine wins (14>10). A: theirs wins (18<22). GAA: both 0 (missing), a tie.
+    // mine=1, theirs=1, ties=1 -> overall TIED.
+    expect(result.current?.tally).toBe('1-1-1')
+    expect(result.current?.status).toBe('TIED')
+  })
+
   it('sanitizes non-ASCII characters out of the opponent name', () => {
     const raw = makeRawMatchups({
       '0': makeMatchup(20, 'midevent', { '1': '10' }, { '1': '5' }, 'Café Team 🏒'),
