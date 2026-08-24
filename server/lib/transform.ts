@@ -11,7 +11,7 @@ export type StandingsRow =
   | { rank: number; name: string; wins: number; losses: number; ties: number; winPct: string; streak: string; isMe?: true }
   | { gap: true }
 
-interface ParsedTeam {
+export interface ParsedTeam {
   teamKey: string
   name: string
   rank: number
@@ -31,6 +31,10 @@ export function formatWinPct(wins: number, losses: number, ties: number): string
 export function formatStreak(streak: { type: string; value: string | number }): string {
   const letter = streak.type === 'wins' ? 'W' : streak.type === 'losses' ? 'L' : 'T'
   return `${letter}${streak.value}`
+}
+
+export function formatRecord(wins: number, losses: number, ties: number): string {
+  return `${wins}-${losses}-${ties}`
 }
 
 function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
@@ -54,7 +58,7 @@ function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
   }
 }
 
-function parseAllTeams(rawYahooJson: unknown): ParsedTeam[] {
+export function parseAllTeams(rawYahooJson: unknown): ParsedTeam[] {
   const teamsContainer = findByKey(rawYahooJson, 'teams') as Record<string, unknown>
   return numberedEntries(teamsContainer)
     .map(parseTeam)

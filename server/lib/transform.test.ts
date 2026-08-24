@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { transformStandings, formatWinPct, formatStreak } from './transform.js'
+import { transformStandings, formatWinPct, formatStreak, parseAllTeams, formatRecord } from './transform.js'
 
 function makeTeam(rank: number, teamKey: string, wins: number, losses: number, ties = 0, streak = { type: 'wins', value: '1' }) {
   return {
@@ -147,5 +147,29 @@ describe('transformStandings', () => {
     const result = transformStandings(raw, '453.l.1.t.8', ASOF)
 
     expect(result.leagueName).toBe('Test League')
+  })
+})
+
+describe('parseAllTeams', () => {
+  it('is exported and returns every team, not just the windowed subset', () => {
+    const raw = makeRawStandings(16)
+    const teams = parseAllTeams(raw)
+
+    expect(teams).toHaveLength(16)
+    expect(teams.map((t) => t.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+  })
+
+  it('can look up a team not in a windowed rows[] result by team key', () => {
+    const raw = makeRawStandings(16)
+    const teams = parseAllTeams(raw)
+
+    const rankFour = teams.find((t) => t.teamKey === '453.l.1.t.4')
+    expect(rankFour).toMatchObject({ rank: 4, wins: 12, losses: 3 })
+  })
+})
+
+describe('formatRecord', () => {
+  it('formats a record as wins-losses-ties', () => {
+    expect(formatRecord(6, 6, 0)).toBe('6-6-0')
   })
 })
