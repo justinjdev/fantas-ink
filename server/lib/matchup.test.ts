@@ -17,14 +17,21 @@ function makeMatchupTeam(teamKey: string, name: string, statValues: Record<strin
   }
 }
 
-function makeMatchup(week: number, status: string, myStats: Record<string, string>, theirStats: Record<string, string>) {
+function makeMatchup(
+  week: number,
+  status: string,
+  myStats: Record<string, string>,
+  theirStats: Record<string, string>,
+  opponentName = 'Puck Norris',
+  opponentTeamKey = '453.l.1.t.2',
+) {
   return {
     matchup: {
       week: String(week),
       status,
       teams: {
         '0': { team: makeMatchupTeam('453.l.1.t.8', 'Cellar Dwellers', myStats).team },
-        '1': { team: makeMatchupTeam('453.l.1.t.2', 'Puck Norris', theirStats).team },
+        '1': { team: makeMatchupTeam(opponentTeamKey, opponentName, theirStats).team },
         count: 2,
       },
     },
@@ -78,14 +85,14 @@ describe('parseMatchups', () => {
 
   it('builds the next matchup from the soonest preevent entry, with no status or tally', () => {
     const raw = makeRawMatchups({
-      '0': makeMatchup(22, 'preevent', {}, {}),
-      '1': makeMatchup(21, 'preevent', {}, {}),
+      '0': makeMatchup(22, 'preevent', {}, {}, 'Later Opponent', '453.l.1.t.5'),
+      '1': makeMatchup(21, 'preevent', {}, {}, 'Sooner Opponent', '453.l.1.t.3'),
     })
 
     const result = parseMatchups(raw, '453.l.1.t.8', CATEGORIES)
 
-    // Week 21 is sooner than week 22 — must pick that one.
-    expect(result.next).toEqual({ opponent: 'Puck Norris', opponentTeamKey: '453.l.1.t.2' })
+    // Week 21 is sooner than week 22 — must pick that one, not the first in the container.
+    expect(result.next).toEqual({ opponent: 'Sooner Opponent', opponentTeamKey: '453.l.1.t.3' })
   })
 
   it('returns null for any matchup state with no matching entry, not a throw', () => {
