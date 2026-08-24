@@ -1,32 +1,66 @@
 import { findByKey, numberedEntries } from './yahooJson.js'
+import { sanitizeAscii } from './asciiSanitize.js'
 
 export interface StandingsPayload {
   asOf: string
   myTeamKey: string
+  leagueName: string
   rows: StandingsRow[]
 }
 
 export type StandingsRow =
-  | { rank: number; name: string; wins: number; losses: number; ties: number; isMe?: true }
+  | { rank: number; name: string; wins: number; losses: number; ties: number; winPct: string; streak: string; isMe?: true }
   | { gap: true }
 
-interface ParsedTeam {
+export interface ParsedTeam {
   teamKey: string
   name: string
   rank: number
   wins: number
   losses: number
   ties: number
+  streak: { type: string; value: string | number }
+}
+
+export function formatWinPct(wins: number, losses: number, ties: number): string {
+  const games = wins + losses + ties
+  const pct = games === 0 ? 0 : wins / games
+  const formatted = pct.toFixed(3)
+  return formatted.startsWith('0.') ? formatted.slice(1) : formatted
+}
+
+// 'wins'/'losses'/'ties' are Yahoo's documented streak types, an unverified
+// guess pending real Yahoo API access. An unrecognized type (missing field,
+// renamed field, etc.) is logged rather than silently rendering as a
+// plausible-looking tie streak.
+export function formatStreak(streak: { type: string; value: string | number }): string {
+  let letter: string
+  if (streak.type === 'wins') letter = 'W'
+  else if (streak.type === 'losses') letter = 'L'
+  else if (streak.type === 'ties') letter = 'T'
+  else {
+    console.warn(`transform: unrecognized streak type ${JSON.stringify(streak.type)}, defaulting to tie`)
+    letter = 'T'
+  }
+  return `${letter}${streak.value}`
+}
+
+export function formatRecord(wins: number, losses: number, ties: number): string {
+  return `${wins}-${losses}-${ties}`
 }
 
 function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
   const teamArray = (rawTeamWrapper as { team: unknown[] }).team
   const teamKey = findByKey(teamArray, 'team_key') as string
-  const name = findByKey(teamArray, 'name') as string
+  const name = sanitizeAscii(findByKey(teamArray, 'name') as string)
   const standings = findByKey(teamArray, 'team_standings') as {
     rank: number | string
     outcome_totals: { wins: string; losses: string; ties: string }
+    streak?: { type: string; value: string | number }
   }
+  // streak is display-only; a team missing it (e.g. zero games played)
+  // must not take down the mandatory standings row.
+  const streak = standings.streak ?? { type: 'ties', value: 0 }
 
   return {
     teamKey,
@@ -35,10 +69,11 @@ function parseTeam(rawTeamWrapper: unknown): ParsedTeam {
     wins: Number(standings.outcome_totals.wins),
     losses: Number(standings.outcome_totals.losses),
     ties: Number(standings.outcome_totals.ties),
+    streak,
   }
 }
 
-function parseAllTeams(rawYahooJson: unknown): ParsedTeam[] {
+export function parseAllTeams(rawYahooJson: unknown): ParsedTeam[] {
   const teamsContainer = findByKey(rawYahooJson, 'teams') as Record<string, unknown>
   return numberedEntries(teamsContainer)
     .map(parseTeam)
@@ -46,6 +81,7 @@ function parseAllTeams(rawYahooJson: unknown): ParsedTeam[] {
 }
 
 export function transformStandings(rawYahooJson: unknown, myTeamKey: string, asOf: string): StandingsPayload {
+  const leagueName = sanitizeAscii(findByKey(rawYahooJson, 'name') as string)
   const teams = parseAllTeams(rawYahooJson)
   const myTeam = teams.find((t) => t.teamKey === myTeamKey)
   if (!myTeam) {
@@ -75,10 +111,12 @@ export function transformStandings(rawYahooJson: unknown, myTeamKey: string, asO
       wins: team.wins,
       losses: team.losses,
       ties: team.ties,
+      winPct: formatWinPct(team.wins, team.losses, team.ties),
+      streak: formatStreak(team.streak),
       ...(team.teamKey === myTeamKey ? { isMe: true as const } : {}),
     })
     previousRank = rank
   }
 
-  return { asOf, myTeamKey, rows }
+  return { asOf, myTeamKey, leagueName, rows }
 }

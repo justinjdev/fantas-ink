@@ -1,3 +1,5 @@
+import { YAHOO_TIMEOUT_MS } from './yahooFetch.js'
+
 const TOKEN_URL = 'https://api.login.yahoo.com/oauth2/get_token'
 
 export interface YahooTokens {
@@ -29,6 +31,7 @@ async function postToken(body: URLSearchParams, env: YahooEnv): Promise<YahooTok
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: body.toString(),
+    signal: AbortSignal.timeout(YAHOO_TIMEOUT_MS),
   })
 
   if (!response.ok) {
