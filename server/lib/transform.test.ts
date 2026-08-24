@@ -160,9 +160,17 @@ describe('parseAllTeams', () => {
   })
 
   it('can look up a team not in a windowed rows[] result by team key', () => {
+    const ASOF = '2026-08-21T11:55:00Z'
     const raw = makeRawStandings(16)
-    const teams = parseAllTeams(raw)
 
+    // With myTeamKey at rank 8, the window is [6, 7, 8, 9, 10], combined with top 3 = [1, 2, 3, gap, 6, 7, 8, 9, 10]
+    // So rank 4 is absent from the windowed result
+    const result = transformStandings(raw, '453.l.1.t.8', ASOF)
+    const ranksInWindow = result.rows.filter((r) => 'rank' in r).map((r) => ('rank' in r ? r.rank : null))
+    expect(ranksInWindow).not.toContain(4)
+
+    // But parseAllTeams returns every team, including rank 4
+    const teams = parseAllTeams(raw)
     const rankFour = teams.find((t) => t.teamKey === '453.l.1.t.4')
     expect(rankFour).toMatchObject({ rank: 4, wins: 12, losses: 3 })
   })
