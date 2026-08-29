@@ -75,6 +75,27 @@ Each prints its test names and `OK`, and exits non-zero on failure. Run all thre
 from the repository root before flashing. Everything else (network, NVS,
 panel) needs the manual pass below.
 
+## Host preview
+
+Renders `renderStandingsPage()`/`renderCategoryPage()`/`renderMessage()` — the actual drawing
+code, with the actual vendored fonts, not an approximation — against fake data, and writes the
+800×480 output to BMP files. No board needed. Requires the Adafruit GFX library installed
+locally (already a dependency of the on-device build, via GxEPD2):
+
+```bash
+clang++ -std=c++17 -Ifirmware/preview -I"$HOME/Documents/Arduino/libraries/Adafruit_GFX_Library" \
+  firmware/preview/preview_main.cpp firmware/display_layout.cpp firmware/category_layout.cpp \
+  -o /tmp/preview && /tmp/preview /tmp \
+  && for f in /tmp/preview_page1_standings /tmp/preview_page2_categories /tmp/preview_message; do sips -s format png "$f.bmp" --out "$f.png" >/dev/null; done
+```
+
+(adjust the second `-I` if `arduino-cli lib install` used a different sketchbook location)
+
+Writes `/tmp/preview_page1_standings.{bmp,png}`, `preview_page2_categories.{bmp,png}`, and
+`preview_message.{bmp,png}` (pass a different output directory as the first argument). The BMP
+is the tool's native output; the PNG conversion uses macOS's built-in `sips`, so it's
+Mac-only — on another OS, open the BMP directly or convert with any image tool.
+
 ## Manual on-device verification
 
 Not automatable — run through this after flashing, both on first bring-up
