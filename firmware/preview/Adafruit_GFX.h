@@ -7,12 +7,16 @@
 // sit earlier on the include path than the real library's Fonts/ directory.
 //
 // This implements only the subset of Adafruit_GFX's API that
-// firmware/display_render.h actually calls (custom GFXfont text only — the
-// device never sets a null font, so the classic 5x7 bitmap font path is not
-// implemented here). It is not a general Adafruit_GFX replacement.
+// firmware/display_render.h actually calls: custom GFXfont text (used for
+// all page content) plus the classic 5x7 bitmap font (used by renderMessage,
+// which never calls setFont()). Neither cp437() nor setTextSize() is ever
+// called in this codebase, so _cp437 stays false and text size stays 1x,
+// matching real Adafruit_GFX's defaults; those paths aren't implemented
+// here. It is not a general Adafruit_GFX replacement.
 #pragma once
 #include <cstdint>
 #include <cstddef>
+#include "glcdfont.h"
 
 #define PROGMEM
 
@@ -57,9 +61,19 @@ class Adafruit_GFX {
     return 1;
   }
 
-  // Mirrors Adafruit_GFX::write()'s custom-font branch.
+  // Mirrors Adafruit_GFX::write()'s custom-font and classic-font branches.
   void write(uint8_t c) {
-    if (!gfxFont) return;
+    if (!gfxFont) {
+      if (c == '\n') {
+        cursor_x = 0;
+        cursor_y += 8;
+        return;
+      }
+      if (c == '\r') return;
+      drawCharClassic(cursor_x, cursor_y, c);
+      cursor_x += 6;
+      return;
+    }
     if (c == '\n') {
       cursor_x = 0;
       cursor_y += gfxFont->yAdvance;
@@ -70,13 +84,29 @@ class Adafruit_GFX {
     cursor_x += gfxFont->glyph[c - gfxFont->first].xAdvance;
   }
 
-  // Mirrors Adafruit_GFX::charBounds()'s custom-font branch, folded into
-  // getTextBounds() directly since nothing here needs the split.
+  // Mirrors Adafruit_GFX::charBounds()'s custom-font and classic-font
+  // branches, folded into getTextBounds() directly since nothing here needs
+  // the split.
   void getTextBounds(const char* str, int16_t x, int16_t y, int16_t* x1, int16_t* y1, uint16_t* w, uint16_t* h) const {
     int16_t minx = 0x7FFF, miny = 0x7FFF, maxx = -1, maxy = -1;
     int16_t cx = x, cy = y;
     *x1 = x; *y1 = y; *w = *h = 0;
-    if (!gfxFont) return;
+    if (!gfxFont) {
+      for (const char* p = str; *p; p++) {
+        uint8_t c = static_cast<uint8_t>(*p);
+        if (c == '\n') { cx = x; cy += 8; continue; }
+        if (c == '\r') continue;
+        int16_t gx2 = cx + 6 - 1, gy2 = cy + 8 - 1;
+        if (cx < minx) minx = cx;
+        if (cy < miny) miny = cy;
+        if (gx2 > maxx) maxx = gx2;
+        if (gy2 > maxy) maxy = gy2;
+        cx += 6;
+      }
+      if (maxx >= minx) { *x1 = minx; *w = maxx - minx + 1; }
+      if (maxy >= miny) { *y1 = miny; *h = maxy - miny + 1; }
+      return;
+    }
     for (const char* p = str; *p; p++) {
       uint8_t c = static_cast<uint8_t>(*p);
       if (c == '\n') { cx = x; cy += gfxFont->yAdvance; continue; }
@@ -102,6 +132,20 @@ class Adafruit_GFX {
   const GFXfont* gfxFont = nullptr;
 
  private:
+  // Mirrors Adafruit_GFX::drawChar()'s classic-font branch at size_x=size_y=1
+  // with _cp437=false (never toggled in this codebase) and bg==textcolor
+  // (the only form setTextColor() is ever called with here), which means
+  // background pixels are never separately drawn — same behavior as the
+  // custom-font branch below.
+  void drawCharClassic(int16_t x, int16_t y, uint8_t c) {
+    for (int8_t i = 0; i < 5; i++) {
+      uint8_t line = kGlcdFont[c * 5 + i];
+      for (int8_t j = 0; j < 8; j++, line >>= 1) {
+        if (line & 1) drawPixel(x + i, y + j, textcolor);
+      }
+    }
+  }
+
   // Mirrors Adafruit_GFX::drawChar()'s custom-font branch.
   void drawChar(int16_t x, int16_t y, uint8_t c) {
     const GFXglyph& glyph = gfxFont->glyph[c - gfxFont->first];
