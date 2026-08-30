@@ -42,7 +42,7 @@ CurrentMatchup sampleCurrentMatchup() {
       {"+/-", 6, 4, true},
       {"PIM", 22, 30, false},
       {"Shots", 88, 91, true},
-      {"Hits", 40, 35, true},
+      {"Hits", 35, 35, true}, // tied - also exercises the no-marker path
       {"Saves", 112, 98, true},
       {"GAA", 2.410, 2.870, false},
   };
