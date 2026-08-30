@@ -39,8 +39,12 @@ inline void HostDisplayStub::writeBMP(const std::string& path) const {
   FILE* f = fopen(path.c_str(), "wb");
   if (!f) throw std::runtime_error("HostDisplayStub::writeBMP: failed to open " + path);
 
-  auto put16 = [&](uint16_t v) { fwrite(&v, 2, 1, f); };
-  auto put32 = [&](uint32_t v) { fwrite(&v, 4, 1, f); };
+  auto fail = [&](const std::string& msg) {
+    fclose(f);
+    throw std::runtime_error("HostDisplayStub::writeBMP: " + msg + " " + path);
+  };
+  auto put16 = [&](uint16_t v) { if (fwrite(&v, 2, 1, f) != 1) fail("write failed for"); };
+  auto put32 = [&](uint32_t v) { if (fwrite(&v, 4, 1, f) != 1) fail("write failed for"); };
 
   fputc('B', f);
   fputc('M', f);
@@ -67,7 +71,8 @@ inline void HostDisplayStub::writeBMP(const std::string& path) const {
       row[static_cast<size_t>(x) * 3 + 1] = v;
       row[static_cast<size_t>(x) * 3 + 2] = v;
     }
-    fwrite(row.data(), 1, static_cast<size_t>(rowSize), f);
+    if (fwrite(row.data(), 1, static_cast<size_t>(rowSize), f) != static_cast<size_t>(rowSize))
+      fail("write failed for");
   }
-  fclose(f);
+  if (fclose(f) != 0) throw std::runtime_error("HostDisplayStub::writeBMP: failed to close " + path);
 }
