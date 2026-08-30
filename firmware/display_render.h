@@ -56,7 +56,7 @@ static constexpr uint16_t DISPLAY_WHITE = 0xFFFF;
 enum class Align { Left, Center, Right };
 
 template <typename DisplayT>
-static void printAligned(DisplayT& display, const std::string& text, int x, int y, Align align = Align::Left) {
+void printAligned(DisplayT& display, const std::string& text, int x, int y, Align align = Align::Left) {
   int16_t tbx, tby;
   uint16_t tbw, tbh;
   display.getTextBounds(text.c_str(), 0, 0, &tbx, &tby, &tbw, &tbh);
@@ -68,17 +68,17 @@ static void printAligned(DisplayT& display, const std::string& text, int x, int 
 }
 
 template <typename DisplayT>
-static void hrule(DisplayT& display, int x1, int y, int x2) {
+void hrule(DisplayT& display, int x1, int y, int x2) {
   display.fillRect(x1, y, x2 - x1, 1, DISPLAY_BLACK);
 }
 
 template <typename DisplayT>
-static void vrule(DisplayT& display, int x, int y1, int y2) {
+void vrule(DisplayT& display, int x, int y1, int y2) {
   display.fillRect(x, y1, 1, y2 - y1, DISPLAY_BLACK);
 }
 
 template <typename DisplayT>
-static int textWidth(DisplayT& display, const std::string& text) {
+int textWidth(DisplayT& display, const std::string& text) {
   int16_t tbx, tby;
   uint16_t tbw, tbh;
   display.getTextBounds(text.c_str(), 0, 0, &tbx, &tby, &tbw, &tbh);
@@ -89,7 +89,7 @@ static int textWidth(DisplayT& display, const std::string& text) {
 // so every caller must setFont() to the font that will actually draw the string
 // BEFORE calling this — measuring with the wrong font fails silently.
 template <typename DisplayT>
-static std::string truncateToWidth(DisplayT& display, const std::string& text, int maxWidth) {
+std::string truncateToWidth(DisplayT& display, const std::string& text, int maxWidth) {
   if (textWidth(display, text) <= maxWidth) return text;
   std::string out = text;
   while (!out.empty()) {
@@ -100,7 +100,7 @@ static std::string truncateToWidth(DisplayT& display, const std::string& text, i
 }
 
 template <typename DisplayT>
-static void drawStandingsTable(DisplayT& display, const std::vector<LayoutRow>& rows,
+void drawStandingsTable(DisplayT& display, const std::vector<LayoutRow>& rows,
                                 bool hasPlayoffTeams, int playoffTeams) {
   const float tableTop = 74.0f, tableBottom = 452.0f;
   const int rankX = 20, teamX = 56, wltX = 235, pctX = 335, strkX = 400;
@@ -143,7 +143,7 @@ static void drawStandingsTable(DisplayT& display, const std::vector<LayoutRow>& 
 }
 
 template <typename DisplayT>
-static void drawMatchupBlock(DisplayT& display, int topY, int bottomY, const char* eyebrow,
+void drawMatchupBlock(DisplayT& display, int topY, int bottomY, const char* eyebrow,
                               const std::string& statusWord, const std::string& oppName,
                               const std::string& tally, const std::string& caption, bool big) {
   const int sx = 484;
@@ -176,7 +176,7 @@ static void drawMatchupBlock(DisplayT& display, int topY, int bottomY, const cha
 }
 
 template <typename DisplayT>
-static void drawMatchupSidebar(DisplayT& display, const CurrentMatchup& current, const MatchupSummary& last,
+void drawMatchupSidebar(DisplayT& display, const CurrentMatchup& current, const MatchupSummary& last,
                                 const NextMatchup& next) {
   const int sbTop = 64, sbBottom = 452;
   const int thisWeekEnd = sbTop + static_cast<int>((sbBottom - sbTop) * 0.4f);
@@ -222,7 +222,7 @@ static void drawMatchupSidebar(DisplayT& display, const CurrentMatchup& current,
   }
 }
 
-static std::string formatStatValue(double value) {
+inline std::string formatStatValue(double value) {
   if (value == static_cast<long long>(value)) {
     return std::to_string(static_cast<long long>(value));
   }

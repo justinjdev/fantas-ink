@@ -80,7 +80,7 @@ void test_current_matchup_carries_a_category_list() {
 
 void test_standings_row_height_evenly_divides_the_available_space() {
   // 10 teams + 1 gap divider, the exact shape that overran the panel with a
-  // hardcoded 40px row height (see display_render.cpp's drawStandingsTable).
+  // hardcoded 40px row height (see display_render.h's drawStandingsTable).
   float height = standingsRowHeight(11, 74.0f, 452.0f);
   CHECK_EQ(74.0f + height * 11 <= 452.0f, true);
 }
