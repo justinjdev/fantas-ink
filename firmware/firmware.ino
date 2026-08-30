@@ -101,7 +101,7 @@ void setup() {
 
   uint32_t cycleStart = millis();
 
-  // Bound by reference — Display embeds a ~15KB framebuffer that will not fit
+  // Bound by reference — Display embeds a ~48KB framebuffer that will not fit
   // on loopTask's 8192-byte stack. See display_render.h.
   Display& display = initDisplay();
   renderMessage(display, "Booting...");
