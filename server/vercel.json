@@ -1,5 +1,8 @@
 {
   "crons": [
     { "path": "/api/cron", "schedule": "55 11 * * *" }
+  ],
+  "rewrites": [
+    { "source": "/callback", "destination": "/api/callback" }
   ]
 }

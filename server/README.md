@@ -13,7 +13,7 @@
 
 ## One-time setup
 
-1. Register an app at https://developer.yahoo.com/apps/ as a **Confidential** client (this app keeps `YAHOO_CLIENT_SECRET` server-side only, never exposed to a browser). Redirect URI must be a real-looking HTTPS URL (Yahoo rejects `oob`) — it never needs to resolve to anything real, since the OAuth code is copied manually from the browser's address bar after redirect.
+1. Register an app at https://developer.yahoo.com/apps/ as a **Confidential** client (this app keeps `YAHOO_CLIENT_SECRET` server-side only, never exposed to a browser). Redirect URI must be a real-looking HTTPS URL (Yahoo rejects `oob`). `/callback` (rewritten to `api/callback.ts`) renders the `code` on a page with a copy button, so the redirect URI can point at `https://<your-deployment>.vercel.app/callback` and actually resolve to something useful instead of just being copied out of the address bar.
 2. Separately, apply for Fantasy Sports API access at https://sports.yahoo.com/developer/access/ for the Client ID from step 1 — as of mid-2026 this is a manual review, no longer a checkbox at registration time. Read-only, single-league, personal-use requests are stated to be granted by default, but there's no published SLA.
 3. Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32` and set it both in Vercel's env vars and locally (`export TOKEN_ENCRYPTION_KEY=...`) before running the setup script.
 4. Connect the Blob store to the project (Storage tab → your store → Connect Project) before doing anything else — this is what makes `BLOB_STORE_ID`/`VERCEL_OIDC_TOKEN` available at all.
